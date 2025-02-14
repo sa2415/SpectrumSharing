@@ -10,7 +10,9 @@ class BaseStation:
         self.devices = ["Cell" for _ in range(num_devices)]
 
     def request_spectrum(self, db):
-        return db.assign_freq_band(self, sum(db.cell_traffic_per_hour for _ in self.devices))
+        projected_traffic = len(self.devices) * db.cell_traffic_per_hour
+        db.assign_freq_band(self, projected_traffic)
+        return projected_traffic  # Return traffic value for network load calculations
 
 class Hotspot:
     def __init__(self, id, freq_band):
@@ -22,7 +24,9 @@ class Hotspot:
         self.devices = ["WiFi" for _ in range(num_devices)]
 
     def request_spectrum(self, db):
-        return db.assign_freq_band(self, sum(25 for _ in self.devices))
+        projected_traffic = len(self.devices) * 25  # WiFi devices each generate 25 Mbps
+        db.assign_freq_band(self, projected_traffic)
+        return projected_traffic
 
 class NetworkDatabase:
     def __init__(self):
@@ -35,7 +39,8 @@ class NetworkDatabase:
             if projected_traffic <= capacity:
                 node.freq_band = band
                 return
-        node.freq_band = node.freq_band  # No upgrade available
+        # No upgrade available; log the issue
+        print(f"Warning: {node.id} ({'BaseStation' if isinstance(node, BaseStation) else 'Hotspot'}) is over capacity!")
 
     def calculate_performance_degradation(self, total_traffic):
         return max(0, total_traffic - self.efficient_network_traffic)
@@ -63,25 +68,27 @@ class NetworkSimulator:
     def run(self):
         for t in range(1, 25):
             wifi_ratio, cell_ratio = self.get_time_ratio(t)
-            max_capacity = 1000 if (0 <= t < 8) else 2000
+            
+            # Dynamically calculate max capacity based on total infrastructure
+            max_capacity = (len(self.base_stations) + len(self.hotspots)) * 200  
+            
             total_devices = int(max_capacity / (wifi_ratio * 25 + cell_ratio * self.db.cell_traffic_per_hour))
             wifi_devices = int(total_devices * wifi_ratio)
             cell_devices = int(total_devices * cell_ratio)
             
             for bs in self.base_stations:
                 bs.allocate_devices(cell_devices // len(self.base_stations))
-                bs.request_spectrum(self.db)
-                
+            
             for hs in self.hotspots:
                 hs.allocate_devices(wifi_devices // len(self.hotspots))
-                hs.request_spectrum(self.db)
                 
+            # Calculate total traffic load in the network
             total_traffic = sum(bs.request_spectrum(self.db) for bs in self.base_stations)
             total_traffic += sum(hs.request_spectrum(self.db) for hs in self.hotspots)
             
             degradation = self.db.calculate_performance_degradation(total_traffic)
             print(f"Hour {t}: Traffic = {total_traffic} Mbps, Degradation = {degradation} Mbps")
 
-# Run the simulator
+
 sim = NetworkSimulator(num_base_stations=random.randint(1, 100), num_hotspots=random.randint(1, 10))
 sim.run()
