@@ -1,94 +1,106 @@
+import numpy as np
 import random
 
-class BaseStation:
-    def __init__(self, id, freq_band):
+# Define Constants
+GRID_SIZE = 100  
+N_HOTSPOTS = 25  
+N_BASE_STATIONS = 25  
+TRAFFIC_RANGE = (10, 100)  # Mbps
+FREQ_BANDS = {
+    "Hotspot": (6.5, 6.89),
+    "Base Station": (6.9, 7.2)
+}
+TIME_SNAPSHOTS = [f"Hour {i}" for i in range(24)]  # Every hour
+COST_FACTORS = {"latency": 1, "power_usage": 1, "spectrum_efficiency": 1}
+
+database = {
+    "hotspots": [],
+    "base_stations": [],
+    "frequency_bands": {band: {"min": f[0], "max": f[1], "available": True} for band, f in FREQ_BANDS.items()}
+}
+
+class NetworkUnit:
+    def __init__(self, id, x, y, radius, traffic_demand, unit_type):
         self.id = id
-        self.freq_band = freq_band
-        self.devices = []
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.connected_devices = random.randint(1, 10)
+        self.traffic_demand = traffic_demand
+        self.frequency = None
+        self.power = 0
+        self.status = "inactive"
+        #Hotspot or base station
+        self.unit_type = unit_type  
+    
+    def update_demand(self):
+        self.traffic_demand = random.randint(*TRAFFIC_RANGE)
+    
+    def connect_device(self):
+        self.connected_devices += 1
+    
+    def disconnect_device(self):
+        self.connected_devices = max(0, self.connected_devices - 1)
+    
+    def allocate_spectrum(self):
+        #what is our threshold gonna be?
+        if self.traffic_demand > 80: 
+            self.frequency = random.uniform(*FREQ_BANDS[self.unit_type])
+            self.status = "active"
+            self.power = random.uniform(1, 10)
+        else:
+            self.frequency = None
+            self.status = "inactive"
+            self.power = 0
 
-    def allocate_devices(self, num_devices):
-        self.devices = ["Cell" for _ in range(num_devices)]
+#creating the random initial hotspots 
+for i in range(N_HOTSPOTS):
+    x, y = random.randint(0, GRID_SIZE), random.randint(0, GRID_SIZE)
+    radius = random.randint(5, 15)
+    traffic_demand = random.randint(*TRAFFIC_RANGE)
+    database["hotspots"].append(NetworkUnit(i, x, y, radius, traffic_demand, "Hotspot"))
 
-    def request_spectrum(self, db):
-        projected_traffic = len(self.devices) * db.cell_traffic_per_hour
-        db.assign_freq_band(self, projected_traffic)
-        return projected_traffic  # Return traffic value for network load calculations
+#creating the random initial BS
+# TODO: Change coz this cant be random - locaiton ofbase stations cant change 
+for i in range(N_BASE_STATIONS):
+    x, y = random.randint(0, GRID_SIZE), random.randint(0, GRID_SIZE)
+    radius = random.randint(5, 15)
+    traffic_demand = random.randint(*TRAFFIC_RANGE)
+    database["base_stations"].append(NetworkUnit(i, x, y, radius, traffic_demand, "Base Station"))
 
-class Hotspot:
-    def __init__(self, id, freq_band):
-        self.id = id
-        self.freq_band = freq_band
-        self.devices = []
 
-    def allocate_devices(self, num_devices):
-        self.devices = ["WiFi" for _ in range(num_devices)]
+for snapshot in TIME_SNAPSHOTS:
+    print(f"Time: {snapshot}")
+    
+    for unit in database["hotspots"] + database["base_stations"]:
+        if random.random() < 0.2:
+            unit.connect_device()
+        if random.random() < 0.1:
+            unit.disconnect_device()
+        
+        unit.update_demand()
+        
+        unit.allocate_spectrum()
+        
+        print(f"{unit.unit_type} {unit.id}: {unit.connected_devices} devices, Demand: {unit.traffic_demand} Mbps, Freq: {unit.frequency}, Status: {unit.status}")
+    
+    print("---")
 
-    def request_spectrum(self, db):
-        projected_traffic = len(self.devices) * 25  # WiFi devices each generate 25 Mbps
-        db.assign_freq_band(self, projected_traffic)
-        return projected_traffic
-
-class NetworkDatabase:
-    def __init__(self):
-        self.freq_band_capacity = {"Low": 500, "Medium": 1000, "High": 2000}
-        self.cell_traffic_per_hour = 50
-        self.efficient_network_traffic = 5000
-
-    def assign_freq_band(self, node, projected_traffic):
-        for band, capacity in sorted(self.freq_band_capacity.items(), key=lambda x: x[1]):
-            if projected_traffic <= capacity:
-                node.freq_band = band
-                return
-        # No upgrade available; log the issue
-        print(f"Warning: {node.id} ({'BaseStation' if isinstance(node, BaseStation) else 'Hotspot'}) is over capacity!")
-
-    def calculate_performance_degradation(self, total_traffic):
-        return max(0, total_traffic - self.efficient_network_traffic)
-
-class NetworkSimulator:
-    def __init__(self, num_base_stations, num_hotspots):
-        self.db = NetworkDatabase()
-        self.base_stations = [BaseStation(i, "Low") for i in range(num_base_stations)]
-        self.hotspots = [Hotspot(i, "Low") for i in range(num_hotspots)]
-        self.time_intervals = {
-            (8, 12): (0.7, 0.3),
-            (12, 15): (0.3, 0.7),
-            (15, 17): (0.8, 0.2),
-            (17, 19): (0.4, 0.6),
-            (19, 24): (0.75, 0.25),
-            (0, 8): (0.5, 0.5)
+def generate_report():
+    report = {
+        "spectrum_allocation": {},
+        "traffic_patterns": {},
+        "performance_metrics": {}
+    }
+    for unit in database["hotspots"] + database["base_stations"]:
+        report["spectrum_allocation"][unit.id] = unit.frequency
+        report["traffic_patterns"][unit.id] = unit.traffic_demand
+        report["performance_metrics"][unit.id] = {
+            "latency": unit.traffic_demand / (unit.connected_devices or 1),
+            "power_usage": unit.power,
+            "spectrum_efficiency": unit.traffic_demand / (unit.frequency or 1)
         }
-    
-    def get_time_ratio(self, t):
-        for (start, end), ratio in self.time_intervals.items():
-            if start <= t < end:
-                return ratio
-        return (0.5, 0.5)
-    
-    def run(self):
-        for t in range(1, 25):
-            wifi_ratio, cell_ratio = self.get_time_ratio(t)
-            
-            # Dynamically calculate max capacity based on total infrastructure
-            max_capacity = (len(self.base_stations) + len(self.hotspots)) * 200  
-            
-            total_devices = int(max_capacity / (wifi_ratio * 25 + cell_ratio * self.db.cell_traffic_per_hour))
-            wifi_devices = int(total_devices * wifi_ratio)
-            cell_devices = int(total_devices * cell_ratio)
-            
-            for bs in self.base_stations:
-                bs.allocate_devices(cell_devices // len(self.base_stations))
-            
-            for hs in self.hotspots:
-                hs.allocate_devices(wifi_devices // len(self.hotspots))
-                
-            # Calculate total traffic load in the network
-            total_traffic = sum(bs.request_spectrum(self.db) for bs in self.base_stations)
-            total_traffic += sum(hs.request_spectrum(self.db) for hs in self.hotspots)
-            
-            degradation = self.db.calculate_performance_degradation(total_traffic)
-            print(f"Hour {t}: Traffic = {total_traffic} Mbps, Degradation = {degradation} Mbps")
+    print("Final Report:", report)
+    return report
 
-
-sim = NetworkSimulator(num_base_stations=random.randint(1, 100), num_hotspots=random.randint(1, 10))
-sim.run()
+final_report = generate_report()
