@@ -1,3 +1,6 @@
+brainstorming:
+
+
 set traffic limits:
     each wifi router produces 25 Mbps of traffic 
     each cell device produces x amnt of traffic per hr
@@ -11,31 +14,6 @@ set time intervals:
     5-7pm: high cell usage (wifi:cell = 40:60), max capacity
     7pm-12am: high wifi usage (wifi:cell = 75:25)
     12am-8am: low cell and wifi usage (wifi:cell = 50:50), 50% max capacity
-
-    -- change in traffic levels (more spectrum/ infrastructure)
-    -- # of devices > capacity 
-    -- radius of base station 
-    -- each device - same amt of traffic 
-
-    -- time frame over years - increase data volume over the years 
-        -- determine which one dont have sufficient data use 
-        -- operators always spend enough 
-    -- sim calls for another base station to be added --> determine the cost of this [2nd step]
-        -- wifi: routers (?) --> interfere *** ($$)
-            -- remove traffic from wifi network --> offload to the wired alt 
-            -- runs in a different band (@80/ 160 Mhz) 
-            -- upgrade routers to handle more bandwidth  *** ($$)
-    -- performance for current infrastructure 
-    -- Spectrum --> base station capacity (100 MHz + 100) --> cap 2x 
-        -- current amt of spectrum/ base station (300 MHz) (total spectum/ #of operators)
-        -- db can assign +100 to that operator --> 300 to 400 --> 1/3 rd more cap 
-
-    -- distribution of devices connected to each base station changes [area specific business vs residential etc.]
-    -- hourly time frame 
-    -- yearly time frame (higher traffic)
-        -- will need to increase capacity 
-
-    -- Request --> db --> reassigning 
 
 initially:
 randomly generate x base stations (max 100)

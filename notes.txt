@@ -1,0 +1,136 @@
+meeting notes from 2/14:
+
+assume network are built to handle currently traffic level
+amnt of traffic per device goes
+network needs more spectrum or more infrastructure
+system has to support the case where there is not enough capcacity
+    - performance not ideal bc too many other devices in its neighborhood to support
+    - not all devices, it's all devices nearby
+    - performacne of celluar base station depends on how many devices it serves and how many nearby base stations that can interfere
+simulation time = years
+each year the amnt of data goes up by 20%
+data rate it wants to have vs data rate it gets (ex. wants 10 gbps but only gets 3)
+want to see what they are actually getting
+
+
+example of assigning spectrum:
+
+base station capacity = proportional to amnt of spectrum that it 100 mhz spectrum
+100 then gets another 100 then capacity doubles
+uses that to assign 
+get a number for current amnt of spectrum assigned per base station (300mhz)
+current amnt of spectrum in US / number of operators
+sim has extra chunk of 500 mhs spectrum that DB can assignDB can assign extra 100 to an operator based on some rules
+
+
+
+base station asks the DB for more spectrum
+most congested base stations will use all their spectrum
+won't be the case that base stations will ask others that are underutilized can i have more spectrum please bc it's too far
+DB can only look and see i have this 500 mhz of extra in 6ghz band that i can give
+gets a request, has to decide what to do for the request
+DB wakes up at 10am, finds out these are all the entities that want spectrum and here's what they get, goes to sleep for an hour, does it again
+
+=================================================
+=================================================
+=================================================
+
+-- change in traffic levels (more spectrum/ infrastructure)
+-- # of devices > capacity 
+-- radius of base station 
+-- each device - same amt of traffic 
+
+-- time frame over years - increase data volume over the years 
+    -- determine which one dont have sufficient data use 
+    -- operators always spend enough 
+-- sim calls for another base station to be added --> determine the cost of this [2nd step]
+    -- wifi: routers (?) --> interfere *** ($$)
+        -- remove traffic from wifi network --> offload to the wired alt 
+        -- runs in a different band (@80/ 160 Mhz) 
+        -- upgrade routers to handle more bandwidth  *** ($$)
+-- performance for current infrastructure 
+-- Spectrum --> base station capacity (100 MHz + 100) --> cap 2x 
+    -- current amt of spectrum/ base station (300 MHz) (total spectum/ #of operators)
+    -- db can assign +100 to that operator --> 300 to 400 --> 1/3 rd more cap 
+
+-- distribution of devices connected to each base station changes [area specific business vs residential etc.]
+-- hourly time frame 
+-- yearly time frame (higher traffic)
+    -- will need to increase capacity 
+
+-- Request --> db --> reassigning 
+
+
+=================================================
+=================================================
+=================================================
+
+meeting notes from 2/21:
+
+base station capacity:
+6.5GHz -7.2GHz
+0.7GHz
+
+(100 * 10^6 Hz) * (2 bits / Hz) = 200 Mbits (per second?)
+
+15 (GB) * 8 (b/B) / 31 (days) * 14 (hrs/day) * 60 (min/hr) * 60 (s/min) = 7.7 * 10^-5 * 10^9 = 7.7 * 10^4 = 77 kbits/s (per user)
+per-user data rate = 77 kbits/s
+aggregate data rate = 77 * N kbits/s where N = # users in a base station
+
+N_max = 200 (Mbits/s) / 77 (kbits/s) =  2597 users
+
+each sector on base station can deliver 2 bits for every hz of spectrum
+100 Mhx -> 2 MBits
+3 sectors?
+600 Mbps
+subscribers: typical cell user = 15 GB per month
+data rate from total monthly usage: month = 31 days, within each day active period = 14 hrs, evenly distributed (approx)
+15*8/31 * 14 hrs * 60 min * 60 s = avg data rate per user --> * num_users to see if exceeds base station capacity
+scale base station density
+1000ppl.km squares --> work out how mnay base stations neededin that area to meet current demand, assume there are that many bs there in a moment, 
+see what happens if the user data rate goes up 20% every year, see how much that changes the need for more capacity
+
+=================================================
+=================================================
+=================================================
+
+our code brainstorming (initial):
+
+set traffic limits:
+    each wifi device produces 25 Mbps
+    each cell device produces x amnt of traffic per hr
+    efficient network = y traffic per hr
+    each freq band will have a max amnt of traffic it can handle
+
+set time intervals:
+    8-12pm: high wifi usage (wifi:cell = 70:30), max capacity
+    12-3pm: high cell usage (wifi:cell = 30:70), max capacity
+    3-5pm: high wifi usage (wifi:cell = 80:20), max capacity
+    5-7pm: high cell usage (wifi:cell = 40:60), max capacity
+    7pm-12am: high wifi usage (wifi:cell = 75:25)
+    12am-8am: low cell and wifi usage (wifi:cell = 50:50), 50% max capacity
+
+initially:
+randomly generate x base stations (max 100)
+1-x hotspots
+for each base station in x, hotspot in 1-x:
+    randomly generate y devices (out of max 100) to be active
+    assign a freq band
+
+for timestep t in 1 to 24:
+    determine interval i for time t
+    based on i, randomly regenerate num of wifi and cell devices based on ratios + capacity
+    based on initial distribution of devices to hotspots and base stations, allocate new num of devices to each to maintain same distribution
+    each hotspot/base station requests spectrum for new x num of devices
+    DB calculates projected traffic for x num of devices
+        if project traffic is over the max traffic for currently assigned freq band:
+            DB checks if larger freq band available:
+                if yes:
+                    DB assigns larger freq band sufficient to handle the new traffic
+                else:
+                    DB assign same freq band
+                    record diff b/w current traffic and current freq band's max traffic (performance/throughput degradation metric)
+        else:
+            DB assign same freq band
+    calculate the total load on the network by summing each device's individual traffic
+    record diff between current traffic and efficient network traffic threshold (performance/throughput degradation metric)
