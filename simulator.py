@@ -135,23 +135,37 @@ for i, (x, y) in enumerate(FIXED_BASE_STATION_LOCATIONS, start=N_HOTSPOTS):
 # ---------------------------- Simulation -------------------------------- #
 for year in range(1):
     for day in range(365):
+        for unit in db.units.values():
+            unit.snapshot_count = 0  # For 1 day (24 hrs) 
+            
         for snapshot in range(24):
             for unit in db.units.values():
-                # simulating random connections and diconnections
+                # simulating random connections and disconnections
                 if random.random() < 0.00: #TODO
                     unit.connected_devices += 1
                 if random.random() < 0.00: #TODO
                     unit.connected_devices = max(0, unit.connected_devices - 1)
+                
                 unit.update_demand()
-                db.request_spectrum(unit.id, unit.traffic_demand / 10)  
-        unit.allocate_spectrum()  
-    # break          
-    print(f"\nDatabase after Year {year + 1}:\n")
+                db.request_spectrum(unit.id, unit.traffic_demand / 10)
+                
+
+                unit.snapshot_count += 1
+                
+                # Allocate spectrum after 24 hrs
+                if unit.snapshot_count == 24:
+                    unit.allocate_spectrum()
+                    unit.snapshot_count = 0 
+                
+
+    print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
     for unit_id, unit in db.units.items():
         print(f"  Unit {unit_id:02d} | Type: {unit.unit_type:<10} | Devices: {unit.connected_devices:02d} | "
-              f"Freq: {unit.frequency if unit.frequency else 'None':<8} | Status: {unit.status}")
+                f"Freq: {unit.frequency if unit.frequency else 'None':<8} | Status: {unit.status}")
+        
+    # Increase traffic demand for each unit
     for unit in db.units.values():
-        unit.traffic_demand *= 1.2       
+        unit.traffic_demand *= 1.2
 
 
 def generate_report():
