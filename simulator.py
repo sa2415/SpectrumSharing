@@ -16,12 +16,6 @@ N_YEARS = 5
 FIXED_BASE_STATION_LOCATIONS = [(random.randint(0, GRID_SIZE), random.randint(0, GRID_SIZE)) for _ in range(N_BASE_STATIONS)]
 
 
-# TODO [swati]: change format of DB
-# {
-#     id1: {type, Unit()}
-#     id2: ...,
-# }
-
 class Database:
     def __init__(self):
         self.units = {}
@@ -63,36 +57,6 @@ class Database:
 
 
 
-# class Database:
-#     def __init__(self):
-#         self.database = {id: Unit(), ...}
-#         self.wifi = ... # aggregate BW that wifi devices are using (MHz)
-#         self.cellular = ...  # aggregate BW that wifi devices are using (MHz)
-#         self.total_bw = 0.7 # Ghz
-#         self.wifi_ratio = 50 #%
-#         self.cellular_ratio = 50 #%
-
-#         # needs to be kept in order
-#         # after every insert, need to sort with band_start as key (O(n) insert)
-#         self.allocated_bands = {
-#             "wifi": [(id, band_start, band_end), ...],
-#             "cellular": [(id, band_start, band_end), ...],
-#         }
-
-#         def insert_allocated_band(item):
-#             id, band_start, band_end = item
-#             # TODO: appends item onto self.allocated_bands in order
-#             # ex.
-#                 # append item onto self.allocated_bands
-#                 # self.allocated_bands.sort(key=band_start) 
-#             # or use linked list with in-order insertion
-#             pass
-
-#         def search_for_free_band(bandwidth):
-#             # searches for a free band
-#             pass
-
-
 class NetworkUnit:
     def __init__(self, id, x, y, radius, traffic_demand, unit_type):
         self.id = id
@@ -114,7 +78,6 @@ class NetworkUnit:
     
     def __repr__(self):
         return f"NetworkUnit(id={self.id}, type={self.unit_type}, freq={self.frequency}, status={self.status})"
-    
 
     def allocate_spectrum(self):
         #what is our threshold gonna be?
@@ -171,7 +134,67 @@ for year in range(N_YEARS):
         print(f"  Unit {unit_id:02d} | Type: {unit.unit_type:<10} | Devices: {unit.connected_devices:02d} | "
               f"Freq: {unit.frequency if unit.frequency else 'None':<8} | Status: {unit.status}")
     for unit in db.units.values():
-        unit.traffic_demand *= 1.2 
+        unit.traffic_demand *= 1.2       
+
+
+def generate_report():
+    report = {
+        "spectrum_allocation": {},
+        "traffic_patterns": {},
+        "performance_metrics": {}
+    }
+    for unit in db.units.values():
+        report["spectrum_allocation"][unit.id] = unit.frequency
+        report["traffic_patterns"][unit.id] = unit.traffic_demand
+        report["performance_metrics"][unit.id] = {
+            "latency": unit.traffic_demand / (unit.connected_devices or 1),
+            "power_usage": unit.power,
+            "spectrum_efficiency": unit.traffic_demand / (unit.frequency or 1)
+        }
+    print("Final Report:", report)
+    return report
+ 
+# final_report = generate_report()
+
+
+
+# ------------------------------- NOTES ------------------------------------- #
+
+# TODO [swati]: change format of DB
+# {
+#     id1: {type, Unit()}
+#     id2: ...,
+# }
+
+# class Database:
+#     def __init__(self):
+#         self.database = {id: Unit(), ...}
+#         self.wifi = ... # aggregate BW that wifi devices are using (MHz)
+#         self.cellular = ...  # aggregate BW that wifi devices are using (MHz)
+#         self.total_bw = 0.7 # Ghz
+#         self.wifi_ratio = 50 #%
+#         self.cellular_ratio = 50 #%
+
+#         # needs to be kept in order
+#         # after every insert, need to sort with band_start as key (O(n) insert)
+#         self.allocated_bands = {
+#             "wifi": [(id, band_start, band_end), ...],
+#             "cellular": [(id, band_start, band_end), ...],
+#         }
+
+#         def insert_allocated_band(item):
+#             id, band_start, band_end = item
+#             # TODO: appends item onto self.allocated_bands in order
+#             # ex.
+#                 # append item onto self.allocated_bands
+#                 # self.allocated_bands.sort(key=band_start) 
+#             # or use linked list with in-order insertion
+#             pass
+
+#         def search_for_free_band(bandwidth):
+#             # searches for a free band
+#             pass
+
 
             #TODO: interference
             
@@ -206,24 +229,4 @@ for year in range(N_YEARS):
     # for hotspot in database["hotspots"]:
     #     hotspot.traffic_demand += 0.2 * hotspot.traffic_demand
     # for base_station in database["base_stations"]:
-    #     base_station.traffic_demand += 0.2 * base_station.traffic_demand               
-
-
-def generate_report():
-    report = {
-        "spectrum_allocation": {},
-        "traffic_patterns": {},
-        "performance_metrics": {}
-    }
-    for unit in db.units.values():
-        report["spectrum_allocation"][unit.id] = unit.frequency
-        report["traffic_patterns"][unit.id] = unit.traffic_demand
-        report["performance_metrics"][unit.id] = {
-            "latency": unit.traffic_demand / (unit.connected_devices or 1),
-            "power_usage": unit.power,
-            "spectrum_efficiency": unit.traffic_demand / (unit.frequency or 1)
-        }
-    print("Final Report:", report)
-    return report
-
-# final_report = generate_report()
+    #     base_station.traffic_demand += 0.2 * base_station.traffic_demand         
