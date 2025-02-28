@@ -13,50 +13,84 @@ FREQ_BANDS = { # TODO: get rid of this
 # TIME_SNAPSHOTS = [f"Hour {i}" for i in range(24)]  # Every hour
 COST_FACTORS = {"latency": 1, "power_usage": 1, "spectrum_efficiency": 1}
 N_YEARS = 5
+FIXED_BASE_STATION_LOCATIONS = [(random.randint(0, GRID_SIZE), random.randint(0, GRID_SIZE)) for _ in range(N_BASE_STATIONS)]
 
-
-database = {
-    "hotspots": [],
-    "base_stations": [],
-    "frequency_bands": {band: {"min": f[0], "max": f[1], "available": True} for band, f in FREQ_BANDS.items()}
-}
-
-# db = Database()
-# db.wifi = ...
 
 # TODO [swati]: change format of DB
 # {
 #     id1: {type, Unit()}
 #     id2: ...,
 # }
+
 class Database:
     def __init__(self):
-        self.database = {id: Unit(), ...}
-        self.wifi = ... # aggregate BW that wifi devices are using (MHz)
-        self.cellular = ...  # aggregate BW that wifi devices are using (MHz)
-        self.total_bw = 0.7 # Ghz
-        self.wifi_ratio = 50 #%
-        self.cellular_ratio = 50 #%
-
-        # needs to be kept in order
-        # after every insert, need to sort with band_start as key (O(n) insert)
+        self.units = {}
+        self.wifi_bw = 0  
+        self.cellular_bw = 0  
+        self.total_bw = 0.7 
+        self.wifi_ratio = 50 
+        self.cellular_ratio = 50  
         self.allocated_bands = {
-            "wifi": [(id, band_start, band_end), ...],
-            "cellular": [(id, band_start, band_end), ...],
+            "wifi": [],
+            "cellular": []
         }
+        self.request_queue = []
 
-        def insert_allocated_band(item):
-            id, band_start, band_end = item
-            # TODO: appends item onto self.allocated_bands in order
-            # ex.
-                # append item onto self.allocated_bands
-                # self.allocated_bands.sort(key=band_start) 
-            # or use linked list with in-order insertion
-            pass
+    def request_spectrum(self, unit_id, bandwidth_needed):
+        unit = self.units[unit_id]
+        unit_type = "wifi" if "Hotspot" in unit.unit_type else "cellular"
 
-        def search_for_free_band(bandwidth):
-            # searches for a free band
-            pass
+        available_bw = (self.total_bw * (self.wifi_ratio if unit_type == "wifi" else self.cellular_ratio) / 100)
+
+        allocated_bw = self.wifi_bw if unit_type == "wifi" else self.cellular_bw
+        remaining_bw = available_bw - allocated_bw
+
+        if bandwidth_needed <= remaining_bw:
+            start_freq = 6.5 if unit_type == "wifi" else 6.9
+            end_freq = start_freq + bandwidth_needed
+
+            unit.frequency = (start_freq, end_freq) 
+            self.allocated_bands[unit_type].append((unit_id, start_freq, end_freq))
+
+            if unit_type == "wifi":
+                self.wifi_bw += bandwidth_needed
+            else:
+                self.cellular_bw += bandwidth_needed
+
+            unit.status = "active"
+        else:
+            unit.status = "congested"  
+
+
+
+# class Database:
+#     def __init__(self):
+#         self.database = {id: Unit(), ...}
+#         self.wifi = ... # aggregate BW that wifi devices are using (MHz)
+#         self.cellular = ...  # aggregate BW that wifi devices are using (MHz)
+#         self.total_bw = 0.7 # Ghz
+#         self.wifi_ratio = 50 #%
+#         self.cellular_ratio = 50 #%
+
+#         # needs to be kept in order
+#         # after every insert, need to sort with band_start as key (O(n) insert)
+#         self.allocated_bands = {
+#             "wifi": [(id, band_start, band_end), ...],
+#             "cellular": [(id, band_start, band_end), ...],
+#         }
+
+#         def insert_allocated_band(item):
+#             id, band_start, band_end = item
+#             # TODO: appends item onto self.allocated_bands in order
+#             # ex.
+#                 # append item onto self.allocated_bands
+#                 # self.allocated_bands.sort(key=band_start) 
+#             # or use linked list with in-order insertion
+#             pass
+
+#         def search_for_free_band(bandwidth):
+#             # searches for a free band
+#             pass
 
 
 class NetworkUnit:
@@ -78,12 +112,10 @@ class NetworkUnit:
         # keeping in mind what is the threshold
         self.traffic_demand = random.randint(*TRAFFIC_RANGE)
     
-    def connect_device(self):
-        self.connected_devices += 1
+    def __repr__(self):
+        return f"NetworkUnit(id={self.id}, type={self.unit_type}, freq={self.frequency}, status={self.status})"
     
-    def disconnect_device(self):
-        self.connected_devices = max(0, self.connected_devices - 1)
-    
+
     def allocate_spectrum(self):
         #what is our threshold gonna be?
         # TODO [nicole]: how much traffic can a 100mHz/200mHz/x Hz spectrum band support?
@@ -101,20 +133,20 @@ class NetworkUnit:
             self.status = "inactive"
             self.power = 0
 
+db = Database()
 #creating the random initial hotspots 
 for i in range(N_HOTSPOTS):
     x, y = random.randint(0, GRID_SIZE), random.randint(0, GRID_SIZE)
     radius = random.randint(5, 15)
     traffic_demand = random.randint(*TRAFFIC_RANGE)
-    database["hotspots"].append(NetworkUnit(i, x, y, radius, traffic_demand, "Hotspot"))
+    db.units[i] = NetworkUnit(i, x, y, radius, traffic_demand, "Hotspot")
 
 #creating the random initial BS
 # TODO [swati]: Change coz this cant be random - locaiton ofbase stations cant change 
-for i in range(N_BASE_STATIONS):
-    x, y = random.randint(0, GRID_SIZE), random.randint(0, GRID_SIZE)
+for i, (x, y) in enumerate(FIXED_BASE_STATION_LOCATIONS, start=N_HOTSPOTS):
     radius = random.randint(5, 15)
     traffic_demand = random.randint(*TRAFFIC_RANGE)
-    database["base_stations"].append(NetworkUnit(i, x, y, radius, traffic_demand, "Base Station"))
+    db.units[i] = NetworkUnit(i, x, y, radius, traffic_demand, "Base Station")
 
 # initially, all of 6.5-7.2GHz are free
 # we reserve 50% for wifi units, and 50% for cell units
@@ -123,12 +155,23 @@ for i in range(N_BASE_STATIONS):
 # every large timestep T, we change the ratios of the reservations for wifi and cell 
 #       according to current ratio of cell/wifi units using the allocated spectrum
 
-db = Database()
 
 for year in range(N_YEARS):
     for day in range(365):
         for snapshot in range(24):
-            print(f"Time: {snapshot}")
+            for unit in db.units.values():
+                if random.random() < 0.2:
+                    unit.connected_devices += 1
+                if random.random() < 0.1:
+                    unit.connected_devices = max(0, unit.connected_devices - 1)
+                unit.update_demand()
+                db.request_spectrum(unit.id, unit.traffic_demand / 10)  
+    print(f"\nDatabase after Year {year + 1}:\n")
+    for unit_id, unit in db.units.items():
+        print(f"  Unit {unit_id:02d} | Type: {unit.unit_type:<10} | Devices: {unit.connected_devices:02d} | "
+              f"Freq: {unit.frequency if unit.frequency else 'None':<8} | Status: {unit.status}")
+    for unit in db.units.values():
+        unit.traffic_demand *= 1.2 
 
             #TODO: interference
             
@@ -145,25 +188,25 @@ for year in range(N_YEARS):
             #       accept: update freq band of the unit, update DB self.wifi/self.cellular
             #       deny: keep freq band of unit the same, nothing in DB changes, mark unit as congested
 
-            for unit in database["hotspots"] + database["base_stations"]:
-                if random.random() < 0.2:
-                    unit.connect_device()
-                if random.random() < 0.1:
-                    unit.disconnect_device()
+    #         for unit in database["hotspots"] + database["base_stations"]:
+    #             if random.random() < 0.2:
+    #                 unit.connect_device()
+    #             if random.random() < 0.1:
+    #                 unit.disconnect_device()
                 
-                unit.update_demand()
+    #             unit.update_demand()
                 
-                unit.allocate_spectrum()
+    #             unit.allocate_spectrum()
                 
-                print(f"{unit.unit_type} {unit.id}: {unit.connected_devices} devices, Demand: {unit.traffic_demand} Mbps, Freq: {unit.frequency}, Status: {unit.status}")
+    #             print(f"{unit.unit_type} {unit.id}: {unit.connected_devices} devices, Demand: {unit.traffic_demand} Mbps, Freq: {unit.frequency}, Status: {unit.status}")
             
-            print("---")
+    #         print("---")
 
-    # increase device data usage by 20% each year
-    for hotspot in database["hotspots"]:
-        hotspot.traffic_demand += 0.2 * hotspot.traffic_demand
-    for base_station in database["base_stations"]:
-        base_station.traffic_demand += 0.2 * base_station.traffic_demand               
+    # # increase device data usage by 20% each year
+    # for hotspot in database["hotspots"]:
+    #     hotspot.traffic_demand += 0.2 * hotspot.traffic_demand
+    # for base_station in database["base_stations"]:
+    #     base_station.traffic_demand += 0.2 * base_station.traffic_demand               
 
 
 def generate_report():
@@ -172,7 +215,7 @@ def generate_report():
         "traffic_patterns": {},
         "performance_metrics": {}
     }
-    for unit in database["hotspots"] + database["base_stations"]:
+    for unit in db.units.values():
         report["spectrum_allocation"][unit.id] = unit.frequency
         report["traffic_patterns"][unit.id] = unit.traffic_demand
         report["performance_metrics"][unit.id] = {
@@ -183,4 +226,4 @@ def generate_report():
     print("Final Report:", report)
     return report
 
-final_report = generate_report()
+# final_report = generate_report()
