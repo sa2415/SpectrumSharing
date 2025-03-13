@@ -27,10 +27,6 @@ class Database:
         self.total_bw = 0.7
         self.wifi_freq_range = (U6_START, (U6_END-U6_START)*50 + U6_START)
         self.cellular_freq_range = ((U6_END-U6_START)*50 + U6_START + 0.1, U6_END)
-        self.allocated_bands = {
-            "wifi": [],
-            "cellular": []
-        }
         self.request_queue = queue.Queue() 
         self.wifi_ptr = U6_START
         self.cellular_ptr = U6_END
@@ -76,7 +72,7 @@ class NetworkUnit:
         self.status = "inactive"
         self.unit_type = unit_type # Hotspot or base station
     
-    def update_demand(self, snapshot, hr):
+    def update_demand(self, snapshot):
         """
         Based on what hr it is, increase/decrease the demand
         TODO: rewrite this code to change the demand based on hour (24) instead of snapshot
@@ -217,31 +213,30 @@ def is_available_spectrum(req):
 
 # ---------------------------- Simulation -------------------------------- #
 
-def hour_to_snapshot(hour):
-    """
-    Given an hour (0-23), returns the snapshot number.
-    """
-    if (0 <= hr and hr <= 7):
-        return 0
-    elif (8 <= hr and hr <= 11):
-        return 1
-    elif (12 <= hr and hr <= 14):
-        return 2
-    elif (15 <= hr and hr <= 16):
-        return 3
-    elif (17 <= hr and hr <= 18):
-        return 4
-    elif (19 <= hr and hr <= 23):
-        return 5
-    return None
+# def hour_to_snapshot(hr):
+#     """
+#     Given an hour (0-23), returns the snapshot number.
+#     """
+#     if (0 <= hr and hr <= 7):
+#         return 0
+#     elif (8 <= hr and hr <= 11):
+#         return 1
+#     elif (12 <= hr and hr <= 14):
+#         return 2
+#     elif (15 <= hr and hr <= 16):
+#         return 3
+#     elif (17 <= hr and hr <= 18):
+#         return 4
+#     elif (19 <= hr and hr <= 23):
+#         return 5
+#     return None
 
 for year in range(3):
     for day in range(365):
         # TODO: make a request every time the demand updates?
         # or only make a request if traffic demand is greater than the current threshold,
         # so some units will be underutilizing their spectrum.
-
-        for hr in range(24):
+        for snapshot in range(6):
             for unit in db.units.values():
                 # # simulating random connections and disconnections
                 # if random.random() < 0.00: #TODO
@@ -250,7 +245,7 @@ for year in range(3):
                 #     unit.connected_devices = max(0, unit.connected_devices - 1)
                 
                 # Step 1: Unit simulates device/population movement by updating traffic demand
-                unit.update_demand(snapshot, hr)
+                unit.update_demand(snapshot)
                 # Step 2: Unit sees if it needs more spectrum from the DB + makes a request if needed
                 unit.make_request()
 
@@ -280,17 +275,15 @@ for year in range(3):
                     
 
             # Step 4: DB re-reserves the portion of total spectrum for wifi vs cellular based on snapshot
-            snapshot = hour_to_snapshot(hr)
+            # snapshot = hour_to_snapshot(hr)
             db.update_ratios(snapshot)
     
-    # Step 5: increase data rate of each user by 20%
-
     print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
     for unit_id, unit in db.units.items():
         print(f"  Unit {unit_id:02d} | Type: {unit.unit_type:<10} | Devices: {unit.connected_devices:02d} | "
                 f"Freq: {unit.frequency if unit.frequency else 'None':<8} | Status: {unit.status}")
         
-    # Increase traffic demand for each unit
+    # Step 5: increase data rate of each user by 20%
     for unit in db.units.values():
         unit.traffic_demand *= 1.2
 
