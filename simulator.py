@@ -1,7 +1,10 @@
 import numpy as np
 import random
+import queue
 
 # Define Constants
+U6_START = 6.5
+U6_END = 7.2
 GRID_SIZE = 100  
 N_HOTSPOTS = 2  
 N_BASE_STATIONS = 2  
@@ -21,48 +24,43 @@ class Database:
         self.units = {}
         self.wifi_bw = 0  
         self.cellular_bw = 0  
-        self.total_bw = 0.7 
-        self.wifi_ratio = 50 
-        self.cellular_ratio = 100 - self.wifi_ratio
+        self.total_bw = 0.7
+        self.wifi_freq_range = (U6_START, (U6_END-U6_START)*50 + U6_START)
+        self.cellular_freq_range = ((U6_END-U6_START)*50 + U6_START + 0.1, U6_END)
         self.allocated_bands = {
             "wifi": [],
             "cellular": []
         }
-        self.request_queue = [] #for later --> fragmentation 
+        self.request_queue = queue.Queue() 
+        self.wifi_ptr = U6_START
+        self.cellular_ptr = U6_END
 
-    def request_spectrum(self, unit_id, bandwidth_needed):
-        unit = self.units[unit_id]
-        if "Hotspot" in unit.unit_type:
-            unit_type = "wifi"
-        else: 
-            unit_type = "cellular"
-
-        if unit_type == "wifi":
-            available_bw = self.total_bw * self.wifi_ratio / 100
-            allocated_bw = self.wifi_bw
-        else:
-            available_bw = self.total_bw * self.cellular_ratio / 100
-            allocated_bw = self.cellular_bw
-
-        remaining_bw = available_bw - allocated_bw
-
-        #TODO: revise this logic 
-        if bandwidth_needed <= remaining_bw:
-            start_freq = 6.5 if unit_type == "wifi" else 6.9
-            end_freq = start_freq + bandwidth_needed
-
-            unit.frequency = (start_freq, end_freq) 
-            self.allocated_bands[unit_type].append((unit_id, start_freq, end_freq))
-
-            if unit_type == "wifi":
-                self.wifi_bw += bandwidth_needed
-            else:
-                self.cellular_bw += bandwidth_needed
-
-            unit.status = "active"
-        else:
-            unit.status = "congested"  
-
+    def update_ratios(self, snapshot):
+        """
+         0:00 -  8:00 : low usage       (wifi:cell = 50:50)
+         8:00 - 12:00 : high wifi usage (wifi:cell = 70:30)
+        12:00 - 15:00 : high cell usage (wifi:cell = 30:70)
+        15:00 - 17:00 : high wifi usage (wifi:cell = 80:20)
+        17:00 - 19:00 : high cell usage (wifi:cell = 40:60)
+        19:00 - 24:00 : high wifi usage (wifi:cell = 75:25)
+        """
+        if (snapshot == 0):
+            db.wifi_ratio = 50
+        elif (snapshot == 1):
+            db.wifi_ratio = 70
+        elif (snapshot == 2):
+            db.wifi_ratio = 30
+        elif (snapshot == 3):
+            db.wifi_ratio = 80
+        elif (snapshot == 4):
+            db.wifi_ratio = 40
+        elif (snapshot == 5):
+            db.wifi_ratio = 75
+        
+        wifi_end = U6_START + (U6_END - U6_START) * db.wifi_ratio
+        self.wifi_freq_range = (U6_START, wifi_end)
+        self.cellular_freq_range = (wifi_end + 0.1, U6_END)
+        
 
 
 class NetworkUnit:
@@ -72,41 +70,109 @@ class NetworkUnit:
         self.y = y
         self.radius = radius
         self.connected_devices = random.randint(1, 2)
-        self.traffic_demand = traffic_demand
-        self.frequency = None
+        self.traffic_demand = traffic_demand # units = MHz
+        self.frequency_bands = [] # list of tuples (start_freq, end_freq)
         self.power = 0
         self.status = "inactive"
-        #Hotspot or base station
-        self.unit_type = unit_type  
+        self.unit_type = unit_type # Hotspot or base station
     
-    def update_demand(self):
-        # TODO [nicole]: based on what hr it is, increase/decrease the demand
-        # keeping in mind what is the threshold
-        self.traffic_demand = random.randint(*TRAFFIC_RANGE)
+    def update_demand(self, snapshot, hr):
+        """
+        Based on what hr it is, increase/decrease the demand
+        TODO: rewrite this code to change the demand based on hour (24) instead of snapshot
+            - demand can be increased/decreased by connecting/disconnecting devices (i.e. users, population density)
+        """
+        if (snapshot == 0):
+            if self.unit_type == "Base Station":
+                self.traffic_demand *= 0.5
+            else:
+                self.traffic_demand *= 0.5
+        elif (snapshot == 1):
+            if self.unit_type == "Base Station":
+                self.traffic_demand *= 1.5
+            else:
+                self.traffic_demand *= 4
+        elif (snapshot == 2):
+            if self.unit_type == "Base Station":
+                self.traffic_demand *= 2
+            else:
+                self.traffic_demand *= 0.5
+        elif (snapshot == 3):
+            if self.unit_type == "Base Station":
+                self.traffic_demand *= 0.25
+            else:
+                self.traffic_demand *= 4
+        elif (snapshot == 4):
+            if self.unit_type == "Base Station":
+                self.traffic_demand *= 2
+            else:
+                self.traffic_demand *= 0.5
+        elif (snapshot == 5):
+            if self.unit_type == "Base Station":
+                self.traffic_demand *= 0.5
+            else:
+                self.traffic_demand *= 2
     
     def __repr__(self):
         return f"NetworkUnit(id={self.id}, type={self.unit_type}, freq={self.frequency}, status={self.status})"
 
-    def allocate_spectrum(self):
-        print(f"Allocating spectrum for Unit {self.id}: Demand = {self.traffic_demand}")
-        #what is our threshold gonna be?
-        # TODO [nicole]: how much traffic can a 100mHz/200mHz/x Hz spectrum band support?
-        # using self.frequency, and calculate the threshold using formula
-        if self.traffic_demand > 80: 
-            # TODO [nicole]: calculate how much freq band (MHz) you need to accomodate self.traffic_demand 
-            # using same formula but rearranged to solve for bandwidth
-            # then assign this to self.frequency if available, otherwise the unit
-            # will just be congested (in the same freq band but with too much traffic demand)
-            available_band = FREQ_BANDS[self.unit_type]
-            self.frequency = random.uniform(*available_band)
-            self.status = "active"
-            self.power = random.uniform(1, 10)
-            print(f"  --> Assigned Frequency: {self.frequency:.2f} MHz, Status: {self.status}")
+    def make_request(self, db_request_queue):
+        """
+        Makes a request to DB for more spectrum if needed, based on current traffic demand.
+
+        Pseudocode:
+            for each band allocated to the unit:
+                calculate the traffic capacity of the band
+                add to total traffic capacity for the unit
+            
+            if curren_traffic_demand > total_traffic_capacity for the unit:
+                make a request to the db for the additional spectrum needed
+        
+        Formula: 
+            required_bw = traffic_demand (MHz) * 2 bits/Hz = 2*traffic_demand Mbps
+        """
+        required_bw = self.traffic_demand * 2
+        
+        if len(self.frequency_bands) == 0:
+            # make a request to DB using self.traffic_demand
+            db_request_queue.push(self.id, required_bw)
         else:
-            self.frequency = None
-            self.status = "inactive"
-            self.power = 0
-            print(f"  --> No spectrum allocated, Status: {self.status}")
+            total_traffic_capacity = 0
+            total_current_bw = 0
+            for band in self.frequency_bands:
+                band_bw = (band[1] - band[0]) * 1000 # multiply by 1000 to convert Ghz to MHz
+                band_traffic_capacity = band_bw / 2
+                total_current_bw += band_bw
+                total_traffic_capacity += band_traffic_capacity
+            
+            if self.traffic_demand > total_traffic_capacity:
+                # make a request to DB using excess traffic
+                assert required_bw > total_current_bw, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= total_current_bw."
+                db_request_queue.push(self.id, required_bw - total_current_bw)
+    
+    def allocate_spectrum(self, spectrum, status, power):
+        # TODO: need some way of passing in what freq band to allocate to myself from the DB
+        print(f"Allocating spectrum for Unit {self.id}: Demand = {self.traffic_demand}")
+
+        #  if amt requested < end - ptr - allocaf.frequency = spectrum
+
+        # threshold = self.frequency * 2
+
+        # if self.traffic_demand > threshold: 
+        #    
+
+        #     bw_required = self.traffic_demand / 2
+            
+        #     available_band = FREQ_BANDS[self.unit_type]
+        #     self.frequency = random.uniform(*available_band)
+        #     self.status = "active"
+        #     self.power = random.uniform(1, 10)
+        #     print(f"  --> Assigned Frequency: {self.frequency:.2f} MHz, Status: {self.status}")
+        # else:
+        #     self.frequency = None
+        #     self.status = "inactive"
+        #     self.power = 0
+        #     print(f"  --> No spectrum allocated, Status: {self.status}")
 
 
 # ---------------------------- Initialization -------------------------------- #
@@ -125,6 +191,23 @@ for i, (x, y) in enumerate(FIXED_BASE_STATION_LOCATIONS, start=N_HOTSPOTS):
     traffic_demand = random.randint(*TRAFFIC_RANGE)
     db.units[i] = NetworkUnit(i, x, y, radius, traffic_demand, "Base Station")
 
+     
+def is_available_spectrum(req):
+    # TODO: check indexing properly 
+    if db.units[req[0]].unit_type == "Hotspot":
+        if (db.wifi_ptr < (U6_END-U6_START)*50 + U6_START and 
+            db.wifi_ptr > U6_START): # end of allocated wifi 
+            return True
+        else: 
+            return False
+        
+    if db.units[req[0]].unit_type == "Base Station":
+        if (db.cellular_ptr > (U6_END-U6_START)*50 + U6_START + 0.1 and
+            db.cellular_ptr < U6_END) : # end of allocated cellular  
+            return True
+        else: 
+            return False
+
 # initially, all of 6.5-7.2GHz are free
 # we reserve 50% for wifi units, and 50% for cell units
 # every timestep t, we can allocate parts of this spectrum to requesting units
@@ -133,30 +216,74 @@ for i, (x, y) in enumerate(FIXED_BASE_STATION_LOCATIONS, start=N_HOTSPOTS):
 #       according to current ratio of cell/wifi units using the allocated spectrum
 
 # ---------------------------- Simulation -------------------------------- #
-for year in range(1):
-    for day in range(365):
-        for unit in db.units.values():
-            unit.snapshot_count = 0  # For 1 day (24 hrs) 
-            
-        for snapshot in range(24):
-            for unit in db.units.values():
-                # simulating random connections and disconnections
-                if random.random() < 0.00: #TODO
-                    unit.connected_devices += 1
-                if random.random() < 0.00: #TODO
-                    unit.connected_devices = max(0, unit.connected_devices - 1)
-                
-                unit.update_demand()
-                db.request_spectrum(unit.id, unit.traffic_demand / 10)
-                
 
-                unit.snapshot_count += 1
+def hour_to_snapshot(hour):
+    """
+    Given an hour (0-23), returns the snapshot number.
+    """
+    if (0 <= hr and hr <= 7):
+        return 0
+    elif (8 <= hr and hr <= 11):
+        return 1
+    elif (12 <= hr and hr <= 14):
+        return 2
+    elif (15 <= hr and hr <= 16):
+        return 3
+    elif (17 <= hr and hr <= 18):
+        return 4
+    elif (19 <= hr and hr <= 23):
+        return 5
+    return None
+
+for year in range(3):
+    for day in range(365):
+        # TODO: make a request every time the demand updates?
+        # or only make a request if traffic demand is greater than the current threshold,
+        # so some units will be underutilizing their spectrum.
+
+        for hr in range(24):
+            for unit in db.units.values():
+                # # simulating random connections and disconnections
+                # if random.random() < 0.00: #TODO
+                #     unit.connected_devices += 1
+                # if random.random() < 0.00: #TODO
+                #     unit.connected_devices = max(0, unit.connected_devices - 1)
                 
-                # Allocate spectrum after 24 hrs
-                if unit.snapshot_count == 24:
-                    unit.allocate_spectrum()
-                    unit.snapshot_count = 0 
-                
+                # Step 1: Unit simulates device/population movement by updating traffic demand
+                unit.update_demand(snapshot, hr)
+                # Step 2: Unit sees if it needs more spectrum from the DB + makes a request if needed
+                unit.make_request()
+
+
+
+            # db.request_spectrum(unit.id, unit.traffic_demand / 10) ?? maybe delete this
+            # Step 3: DB processes all requests from request queue for this hr
+            # TODO: assignment of spectrum does not have to be contiguous
+            #       assign wifi from the bottom up, cellular from the top down
+            #   for each req in request_queue:
+            #       check if DB can fulfill the unit's request (either partially or fully)
+            #       call unit.allocate_spectrum(spectrum, status=congested) for unit if needed
+                    # unit.allocate_spectrum(spectrum) spectrum = how much spectrum DB is giving to the unit
+            #       update the unit's status in the DB
+            
+            # loop through all the requests in the rq queue 
+            for request in db.request_queue():
+                # if space available allocate the spectrum 
+                if is_available_spectrum(): #TODO
+                    request[0].allocate_spectrum(request[1]) # check - stored as a tuple with request as second term 
+                    request[0].status = "active"
+                else: 
+                    request[0].status = "congested"
+                    
+                # request processed
+                db.request_queue.pop()
+                    
+
+            # Step 4: DB re-reserves the portion of total spectrum for wifi vs cellular based on snapshot
+            snapshot = hour_to_snapshot(hr)
+            db.update_ratios(snapshot)
+    
+    # Step 5: increase data rate of each user by 20%
 
     print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
     for unit_id, unit in db.units.items():

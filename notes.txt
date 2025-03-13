@@ -1,3 +1,20 @@
+meeting notes from 2/28
+- to prevent interference willn ot put cell and wifi device within distance d of each other
+- for now ignore interference
+- spectrum side
+    - operators and wifi already have some spectrum
+    - both start off with spectrum not in U6 band
+assumption: operating at capacity already, any new requests are for U6
+
+- report
+    - user manual for what each metric is
+    - documentation on how to use it, how to expand it, how is it organized, how does it function
+
+- carrier aggregation = use fragments of bands together
+
+=================================================
+=================================================
+=================================================
 meeting notes from 2/14:
 
 assume network are built to handle currently traffic level
