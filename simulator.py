@@ -108,9 +108,11 @@ class NetworkUnit:
                 self.traffic_demand *= 0.5
             else:
                 self.traffic_demand *= 2
+
+        print(f"Unit {self.id} ({self.unit_type}) traffic demand updated: {self.traffic_demand} Mbps")
     
     def __repr__(self):
-        return f"NetworkUnit(id={self.id}, type={self.unit_type}, freq={self.frequency}, status={self.status})"
+        return f"NetworkUnit(id={self.id}, type={self.unit_type}, freq={self.frequency_bands}, status={self.status})"
 
     def make_request(self, db_request_queue):
         """
@@ -131,7 +133,7 @@ class NetworkUnit:
         
         if len(self.frequency_bands) == 0:
             # make a request to DB using self.traffic_demand
-            db_request_queue.push(self.id, required_bw)
+            db_request_queue.put((self.id, required_bw))
         else:
             total_traffic_capacity = 0
             total_current_bw = 0
@@ -144,7 +146,7 @@ class NetworkUnit:
             if self.traffic_demand > total_traffic_capacity:
                 # make a request to DB using excess traffic
                 assert required_bw > total_current_bw, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= total_current_bw."
-                db_request_queue.push(self.id, required_bw - total_current_bw)
+                db_request_queue.put((self.id, required_bw - total_current_bw))
 
             
 
@@ -182,10 +184,10 @@ def is_available_spectrum(req):
 
 def allocate_spectrum(unit, req):
     # TODO: need some way of passing in what freq band to allocate to myself from the DB
-    print(f"Allocating spectrum for Unit {unit.id}: Demand = {unit.req[1]}")
+    # print(f"Allocating spectrum for Unit {unit.id}: Demand = {unit.req[1]}")
     if unit.unit_type == "Hotspot":
         start_freq = db.wifi_ptr
-        end_freq = start_freq + req[1]
+        end_freq = start_freq + req
 
         if end_freq <= db.wifi_freq_range[1]:
             unit.frequency_bands.append((start_freq, end_freq)) 
@@ -194,7 +196,7 @@ def allocate_spectrum(unit, req):
             return True
         
     elif unit.unit_type == "Base Station":
-        start_freq = db.cellular_ptr - req[0]
+        start_freq = db.cellular_ptr - req
         end_freq = db.cellular_ptr
 
         if start_freq >= db.cellular_freq_range[0]:
@@ -203,6 +205,7 @@ def allocate_spectrum(unit, req):
             unit.status = "active" 
             return True 
         
+    print(f"Unable to allocate spectrum to Unit {unit}, status: congested.")    
     unit.status = "congested" 
     return False
 
@@ -249,7 +252,7 @@ for year in range(3):
                 # Step 1: Unit simulates device/population movement by updating traffic demand
                 unit.update_demand(snapshot)
                 # Step 2: Unit sees if it needs more spectrum from the DB + makes a request if needed
-                unit.make_request()
+                unit.make_request(db.request_queue)
 
 
 
@@ -264,13 +267,17 @@ for year in range(3):
             #       update the unit's status in the DB
             
             # loop through all the requests in the rq queue 
-            for request in db.request_queue():
-                unit = db.units.get(request[0]) # check - idk if this works 
+            while not db.request_queue.empty():  
+                request = db.request_queue.get()  
+                unit_id, bandwidth = request 
+                unit = db.units.get(unit_id)
+                
                 # if space available allocate the spectrum 
-                allocate_spectrum(unit, request) # check - stored as a tuple with request as second term 
+                print(f"Processing request for Unit {unit_id} requesting {bandwidth} Mbps spectrum.")
+                allocate_spectrum(unit, bandwidth) # check - stored as a tuple with request as second term 
 
                 # request processed
-                db.request_queue.pop()
+                db.request_queue.get()
                     
 
             # Step 4: DB re-reserves the portion of total spectrum for wifi vs cellular based on snapshot
@@ -278,9 +285,9 @@ for year in range(3):
             db.update_ratios(snapshot)
     
     print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
-    for unit_id, unit in db.units.items():
-        print(f"  Unit {unit_id:02d} | Type: {unit.unit_type:<10} | Devices: {unit.connected_devices:02d} | "
-                f"Freq: {unit.frequency if unit.frequency else 'None':<8} | Status: {unit.status}")
+    # for unit_id, unit in db.units.items():
+        # print(f"  Unit {unit_id:02d} | Type: {unit.unit_type:<10} | Devices: {unit.connected_devices:02d} | "
+        #         f"Freq: {unit.frequency if unit.frequency_bands else 'None':<8} | Status: {unit.status}")
         
     # Step 5: increase data rate of each user by 20%
     for unit in db.units.values():
