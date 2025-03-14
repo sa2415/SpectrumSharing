@@ -145,30 +145,8 @@ class NetworkUnit:
                 # make a request to DB using excess traffic
                 assert required_bw > total_current_bw, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= total_current_bw."
                 db_request_queue.push(self.id, required_bw - total_current_bw)
-    
-    def allocate_spectrum(self, spectrum, status, power):
-        # TODO: need some way of passing in what freq band to allocate to myself from the DB
-        print(f"Allocating spectrum for Unit {self.id}: Demand = {self.traffic_demand}")
 
-        #  if amt requested < end - ptr - allocaf.frequency = spectrum
-
-        # threshold = self.frequency * 2
-
-        # if self.traffic_demand > threshold: 
-        #    
-
-        #     bw_required = self.traffic_demand / 2
             
-        #     available_band = FREQ_BANDS[self.unit_type]
-        #     self.frequency = random.uniform(*available_band)
-        #     self.status = "active"
-        #     self.power = random.uniform(1, 10)
-        #     print(f"  --> Assigned Frequency: {self.frequency:.2f} MHz, Status: {self.status}")
-        # else:
-        #     self.frequency = None
-        #     self.status = "inactive"
-        #     self.power = 0
-        #     print(f"  --> No spectrum allocated, Status: {self.status}")
 
 
 # ---------------------------- Initialization -------------------------------- #
@@ -189,20 +167,44 @@ for i, (x, y) in enumerate(FIXED_BASE_STATION_LOCATIONS, start=N_HOTSPOTS):
 
      
 def is_available_spectrum(req):
-    # TODO: check indexing properly 
-    if db.units[req[0]].unit_type == "Hotspot":
-        if (db.wifi_ptr < (U6_END-U6_START)*50 + U6_START and 
-            db.wifi_ptr > U6_START): # end of allocated wifi 
+    unit = db.units.get(req[0])  # Ensure req[0] exists in db.units
+    if not unit:
+        return False
+    
+    if unit.unit_type == "Hotspot":
+        return db.wifi_freq_range[0] < db.wifi_ptr < db.wifi_freq_range[1]
+
+    if unit.unit_type == "Base Station":
+        return db.cellular_freq_range[0] < db.cellular_ptr < db.cellular_freq_range[1]
+
+    return False  
+
+
+def allocate_spectrum(unit, req):
+    # TODO: need some way of passing in what freq band to allocate to myself from the DB
+    print(f"Allocating spectrum for Unit {unit.id}: Demand = {unit.req[1]}")
+    if unit.unit_type == "Hotspot":
+        start_freq = db.wifi_ptr
+        end_freq = start_freq + req[1]
+
+        if end_freq <= db.wifi_freq_range[1]:
+            unit.frequency_bands.append((start_freq, end_freq)) 
+            db.wifi_ptr = end_freq  
+            unit.status = "active"  
             return True
-        else: 
-            return False
         
-    if db.units[req[0]].unit_type == "Base Station":
-        if (db.cellular_ptr > (U6_END-U6_START)*50 + U6_START + 0.1 and
-            db.cellular_ptr < U6_END) : # end of allocated cellular  
-            return True
-        else: 
-            return False
+    elif unit.unit_type == "Base Station":
+        start_freq = db.cellular_ptr - req[0]
+        end_freq = db.cellular_ptr
+
+        if start_freq >= db.cellular_freq_range[0]:
+            unit.frequency_bands.append((start_freq, end_freq))  
+            db.cellular_ptr = start_freq 
+            unit.status = "active" 
+            return True 
+        
+    unit.status = "congested" 
+    return False
 
 # initially, all of 6.5-7.2GHz are free
 # we reserve 50% for wifi units, and 50% for cell units
@@ -263,13 +265,10 @@ for year in range(3):
             
             # loop through all the requests in the rq queue 
             for request in db.request_queue():
+                unit = db.units.get(request[0]) # check - idk if this works 
                 # if space available allocate the spectrum 
-                if is_available_spectrum(): #TODO
-                    request[0].allocate_spectrum(request[1]) # check - stored as a tuple with request as second term 
-                    request[0].status = "active"
-                else: 
-                    request[0].status = "congested"
-                    
+                allocate_spectrum(unit, request) # check - stored as a tuple with request as second term 
+
                 # request processed
                 db.request_queue.pop()
                     
