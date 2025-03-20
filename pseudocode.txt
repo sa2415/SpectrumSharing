@@ -1,0 +1,9 @@
+Pseudocode for revision of system. 
+
+1. Make a map that mimics areas of high density and low density population to simulate traffic_demand
+    a. Commercial & Business Districts
+    b. High-Density Residential Areas
+    c. Educational & Research Institutions
+    etc. 
+
+2. Place BS and HS according to this population density and traffic demand 
