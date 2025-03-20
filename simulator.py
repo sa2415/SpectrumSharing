@@ -57,7 +57,8 @@ class Database:
         self.wifi_freq_range = (U6_START, wifi_end)
         self.cellular_freq_range = (wifi_end + 0.1, U6_END)
         
-
+# Database just assigns 
+    # distance dependent 
 
 class NetworkUnit:
     def __init__(self, id, x, y, radius, traffic_demand, unit_type):
@@ -283,7 +284,11 @@ for year in range(3):
             # Step 4: DB re-reserves the portion of total spectrum for wifi vs cellular based on snapshot
             # snapshot = hour_to_snapshot(hr)
             db.update_ratios(snapshot)
+            # loop thru each freq bands/ unit - check if its outside the range assigned - remove the freq _band + mark as congested
+            # self.traffic_demand > total_amt of traffic that can be supported 
+            db.update_units()
     
+        #TODO: 
     print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
     # for unit_id, unit in db.units.items():
         # print(f"  Unit {unit_id:02d} | Type: {unit.unit_type:<10} | Devices: {unit.connected_devices:02d} | "
