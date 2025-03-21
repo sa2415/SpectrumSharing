@@ -34,39 +34,81 @@ class NetworkUnit:
         self.limit = limit
 
     """
-    STEP 4: Updating traffic demand according to population density and time of day 
-    """
-    # For every unit in the db, if group_id == None allocate the entire spectrum 
-    # else
-    # TODO: Nicole
-    def calculate_traffic_demand(self, snapshot):
-        # do the per 4 hours logic 
-        pass
+    STEP 4: Updating traffic demand according to population density and time of day
 
+                                          low         medium       high
+    density = 0: [20, 50] MHz       --> [20,30],     [30,40],     [40,50]
+    density = 1: [200, 500] MHz     --> [200,300],   [300,400],   [400,500]
+    density = 3: [2000, 5000] MHz   --> [2000,3000], [3000,4000], [4000,5000]
+
+    0:00 -  8:00 : low usage       (wifi:cell = 50:50)
+    8:00 - 12:00 : high wifi usage (wifi:cell = 70:30)
+    12:00 - 15:00 : high cell usage (wifi:cell = 30:70)
+    15:00 - 17:00 : high wifi usage (wifi:cell = 80:20)
+    17:00 - 19:00 : high cell usage (wifi:cell = 40:60)
+    19:00 - 24:00 : high wifi usage (wifi:cell = 75:25)
+    """
+    def calculate_traffic_demand(self, snapshot):
+        
+        # pop density --> (lower, upper) traffic demand bound for the unit
+        traffic_demand_bounds = {
+            0: (20, 50),
+            1: (200, 500),
+            3: (2000, 5000)
+        }
+
+        # (snapshot, unit_type) --> traffic intensity level
+        traffic_intensity = {
+            (0, UnitType.HS): "low",
+            (0, UnitType.BS): "low",
+            (1, UnitType.HS): "medium",
+            (1, UnitType.BS): "low",
+            (2, UnitType.HS): "medium",
+            (2, UnitType.BS): "high",
+            (3, UnitType.HS): "high",
+            (3, UnitType.BS): "medium",
+            (4, UnitType.HS): "medium",
+            (4, UnitType.BS): "high",
+            (5, UnitType.HS): "high",
+            (5, UnitType.BS): "low",
+        }
+
+        lower_bound, upper_bound = traffic_demand_bounds[self.density]
+        traffic_intensity = traffic_intensity[(snapshot, self.unit_type)]
+
+        range_size = upper_bound - lower_bound
+        third = range_size // 3
+
+        match traffic_intensity:
+            case "low":
+                upper_bound = lower_bound + third
+            case "medium":
+                lower_bound += third
+                upper_bound = lower_bound + third
+            case "high":
+                lower_bound = upper_bound - third
+
+        return random.randint(lower_bound, upper_bound)
 
     def update_traffic_demand(self, snapshot):
-        self.traffic_demand = self.calculate_traffic_demand(snapshot, self.density)
-        pass
+        self.traffic_demand = self.calculate_traffic_demand(snapshot)
 
 
     """
-    STEP 5: 
+    STEP 5: Makes a request to DB for more spectrum if needed, based on current traffic demand.
+
+    Pseudocode:
+        for each band allocated to the unit:
+            calculate the traffic capacity of the band
+            add to total traffic capacity for the unit
+        
+        if curren_traffic_demand > total_traffic_capacity for the unit:
+            make a request to the db for the additional spectrum needed
+    
+    Formula: 
+        required_bw = traffic_demand (MHz) * 2 bits/Hz = 2*traffic_demand Mbps
     """
     def make_request(self, db_request_queue):
-        """
-        Makes a request to DB for more spectrum if needed, based on current traffic demand.
-
-        Pseudocode:
-            for each band allocated to the unit:
-                calculate the traffic capacity of the band
-                add to total traffic capacity for the unit
-            
-            if curren_traffic_demand > total_traffic_capacity for the unit:
-                make a request to the db for the additional spectrum needed
-        
-        Formula: 
-            required_bw = traffic_demand (MHz) * 2 bits/Hz = 2*traffic_demand Mbps
-        """
         required_bw = self.traffic_demand * 2
         
         if len(self.frequency_bands) == 0:
@@ -152,38 +194,53 @@ STEP 2: Placing BS and HS
 """
 db = Database()
 unit_id = 0
+block_size = 100
+grid_size = 1000
 
-for x in range(city_size[0]):
-    for y in range(city_size[1]):
-        pop_density = population_density[x, y]
+for i in range(city_size[0]):
+    for j in range(city_size[1]):
+        pop_density = population_density[i, j]
         traffic_demand = 0
         #setting the number of hs and bs acc to density [TODO]
         if pop_density == 2:
             hs_count = 10
             bs_count = 5
-            # traffic_demand = random.randint(2000, 5000)
         elif pop_density == 1:
             hs_count = 5
             bs_count = 2
-            # traffic_demand = random.randint(200, 500)
         else:
             hs_count = 3
             bs_count = 1
-            # traffic_demand = random.randint(20, 50)
 
-        # TODO: Nicole
-        for i in range (hs_count):
-            # x_pos = random.randint(___, ___) for region x, y
-            # y_pos = random.randint(___, ___) for region x, y
+        coordinates = set()
+        for _ in range (hs_count):
+            x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
+            y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
+
             # no 2 units can have the same coords 
+            while (x_pos, y_pos) in coordinates:
+                x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
+                y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
+
+            assert ((x_pos, y_pos) not in coordinates)
+            coordinates.add((x_pos, y_pos))
+
             db.database[unit_id] = NetworkUnit(unit_id, (x_pos, y_pos), traffic_demand, UnitType.HS, pop_density) 
             unit_id += 1
 
 
-        for i in range (bs_count):
-            # x_pos = random.randint(___, ___) for region x, y
-            # y_pos = random.randint(___, ___) for region x, y
+        for _ in range (bs_count):
+            x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
+            y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
+
             # no 2 units can have the same coords 
+            while (x_pos, y_pos) in coordinates:
+                x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
+                y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
+
+            assert ((x_pos, y_pos) not in coordinates)
+            coordinates.add((x_pos, y_pos))
+
             db.database[unit_id] = NetworkUnit(unit_id, (x_pos, y_pos), traffic_demand, UnitType.BS, pop_density) 
             unit_id += 1
 
@@ -299,18 +356,27 @@ def allocate_spectrum():
     # return False
 
 
+def get_snapshot_duration(snapshot):
+    """
+    0:00 -  8:00
+    8:00 - 12:00
+    12:00 - 15:00 
+    15:00 - 17:00
+    17:00 - 19:00
+    19:00 - 24:00
+    """
+    match snapshot:
+        case 0: return 8 
+        case 1: return 4
+        case 2: return 3
+        case 3: return 2
+        case 4: return 2
+        case 5: return 5
+    return 0
+
 """
 STEP 7: Simulation loop 
 """
-# TODO: Nicole
-def get_snapshot_duration(snapshot):
-    match snapshot:
-        case 0:
-            pass 
-
-    pass
-
-
 def simulate_dynamic_allocation():
     for year in range(3):
         for day in range(365):

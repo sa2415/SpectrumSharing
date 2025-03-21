@@ -14,7 +14,6 @@ can be proportional to the population.
         -  traffic_demand
         -  status: congested or available 
         -  wifi/ cellular range assigned to it 
-        -  unti_type
 
 
 - Once "map" is initialized. Distribute the spectrum (6.2GHz to 7.1GHz)
@@ -31,7 +30,7 @@ can be proportional to the population.
                 - otherwise if > D_c, then it can be allocated the same range of spectrum
             - D_c = 500m 
 
-        - Available spectrum decreases if the distance is less than D_w/ D_c, with a halving of spectrum as distance approaches zero. (TODO)
+        - Available spectrum decreases if the distance is less than D_w/ D_c, with a halving of spectrum as distance approaches zero.
 
 - At interval of 4 hours (= 1 snapshot), change the traffic_demand (according to time of day i.e. commute hours, work hours, shopping hours, lunch time etc.)
     - adjust the wifi/cellular frequency allocation at the beginning of every snapshot (based on prediction)
@@ -49,7 +48,6 @@ TODO: Understand the logic for congestion
     - put in better print statements to see if its working properly 
     - RIGHT NOW ITS PROBABLY BOGUS : TO BE DEBUGGED 
     - GAH NICOLE I RLLY DT THIS IS USEFUL IN ANY WAY
-    - EDGE CASE: Unit < D_w apart from 1+ other units - how is frequency range allocated then?
 
 """
 
@@ -74,13 +72,12 @@ traffic_demand = np.vectorize(demand_map.get)(population_density) #mapping the p
 STEP 2: Placing BS and HS 
 """
 city_database = {} #initializing the db
-unit_id = 0
 
-#looping thru the matrix - number of units not the city square 
+#looping thru the matrix 
 for x in range(city_size[0]):
     for y in range(city_size[1]):
         pop_density = population_density[x, y]
-        #setting the number of hs and bs acc to density [TODO]
+        #setting the number of hs and bs acc to density 
         if pop_density == 2:
             hs_count = 10
             bs_count = 5
@@ -90,23 +87,14 @@ for x in range(city_size[0]):
         else:
             hs_count = 3
             bs_count = 1
-        for i in range (hs_count):
-            city_database[unit_id] = {
-                "traffic_demand": traffic_demand[x, y], #look at this
-                "wifi_range": 0, 
-                "status": "available"
-            }
-            unit_id += 1
-
-        for j in range (bs_count):
-            city_database[unit_id] = {
-                "position": 
-                "traffic_demand": traffic_demand[x, y], #look at this
-                "wifi_range": 0, 
-                "status": "available"
-            }
-            unit_id += 1
-
+        city_database[(x, y)] = {
+            "traffic_demand": traffic_demand[x, y],
+            "hs_count": hs_count,
+            "bs_count": bs_count,
+            "wifi_range": 0, 
+            "cellular_range": 0,  
+            "status": "available"
+        }
 
 
 """
@@ -124,7 +112,8 @@ def allocate_spectrum():
     for (x, y), data in city_database.items():
         total_hs = data["hs_count"]
         total_bs = data["bs_count"]
-        # TODO: each unit can use same spectrum if >D_w/D_c - implement
+        
+
         if total_hs > 0:
             data["wifi_range"] = wifi_spectrum / total_hs #TODO: currently evenly diving spectrum across all units - shld do acc to traffic demand?
         if total_bs > 0:
@@ -151,10 +140,8 @@ def distance_based_sharing():
             distances = cdist([[(x, y)]], hs_positions)[0]
             for i, dist in enumerate(distances):
                 if dist < D_w:
-                    # sum of it < frq allocated (wifi_spectrum)
                     # Halving spectrum if distance is closer than D_w
-                    data["wifi_range"] -= (wifi_spectrum / data["hs_count"]) * (1 - (dist / D_w))  
-                # else: assign any frquency in frequency allocated 
+                    data["wifi_range"] -= (wifi_spectrum / data["hs_count"]) * (1 - (dist / D_w)) 
         if data["bs_count"] > 0:
             distances = cdist([[(x, y)]], bs_positions)[0]
             for i, dist in enumerate(distances):
@@ -169,11 +156,8 @@ STEP 5: Congestion logic
 
 # Simulating congestion detection
 # is it meant to be this simple?? @nicole
-# 2 bits 
 def detect_congestion():
     for data in city_database.values():
-        # case on unit type
-        # TODO: convert Hz to bps (2 bit / ...)
         if data["traffic_demand"] > data["wifi_range"] and data["hs_count"] > 0:
             data["status"] = "congested"
         elif data["traffic_demand"] > data["cellular_range"] and data["bs_count"] > 0:
@@ -214,15 +198,8 @@ def simulate_dynamic_allocation():
         
         congested_count = 0
         for (x, y), data in city_database.items():
-            # Check if congestion occurs
-            # TODO 
-            if data["traffic_demand"] > data["wifi_range"] and data["hs_count"] > 0:
-                data["status"] = "congested"
-                request_queue.append((x, y, "HS", data["traffic_demand"])) # TODO: check if data["traffic_demand"]
-                congested_count += 1
-            elif data["traffic_demand"] > data["cellular_range"] and data["bs_count"] > 0:
-                data["status"] = "congested"
-                request_queue.append((x, y, "BS", data["traffic_demand"]))  # TODO: check if data["traffic_demand"]
+            if data["status"] == "congested": # yea okay idt my congestion logic is correct 
+                request_queue.append((x, y, "HS" if data["hs_count"] > 0 else "BS"))
                 congested_count += 1
         
         # Process Requests every hour (as we discussed)
@@ -232,40 +209,15 @@ def simulate_dynamic_allocation():
     return congestion_levels_dynamic
 
 # Dynamic Allocation Processing
-# def process_requests(request_queue):
-#     while request_queue:
-#         x, y, unit_type = request_queue.popleft()
-#         data = city_database[(x, y)]
-        
-#         if unit_type == "HS" and wifi_spectrum >= 50:
-#             data["wifi_range"] += 50 #TODO: currently hardcoded to increase by 50 MHz - need to change
-#         elif unit_type == "BS" and cellular_spectrum >= 50:
-#             data["cellular_range"] += 50 #TODO: currently hardcoded to increase by 50 MHz - need to change
-
-
-# Dynamic Allocation Processing
 def process_requests(request_queue):
     while request_queue:
-        x, y, unit_type, requested_spectrum = request_queue.popleft()  
+        x, y, unit_type = request_queue.popleft()
         data = city_database[(x, y)]
         
-        if unit_type == "HS":  
-            if wifi_spectrum >= requested_spectrum: 
-                data["wifi_range"] += requested_spectrum 
-                wifi_spectrum -= requested_spectrum  
-                data["status"] = "available"
-            else:
-                data["status"] = "congested"
-                print(f"Not enough Wi-Fi spectrum available for HS at ({x}, {y}).")
-        
-        elif unit_type == "BS": 
-            if cellular_spectrum >= requested_spectrum: 
-                data["cellular_range"] += requested_spectrum  
-                cellular_spectrum -= requested_spectrum 
-                data["status"] = "available"
-            else:
-                data["status"] = "congested"
-                print(f"Not enough Cellular spectrum available for BS at ({x}, {y}).")
+        if unit_type == "HS" and wifi_spectrum >= 50:
+            data["wifi_range"] += 50 #TODO: currently hardcoded to increase by 50 MHz - need to change
+        elif unit_type == "BS" and cellular_spectrum >= 50:
+            data["cellular_range"] += 50 #TODO: currently hardcoded to increase by 50 MHz - need to change
 
 """
 STEP 7: Increase population density by 20% after 1 year
