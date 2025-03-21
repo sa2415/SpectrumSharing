@@ -5,6 +5,9 @@ from scipy.spatial.distance import cdist
 import random
 from enum import Enum
 import queue
+from collections import defaultdict
+import math
+
 
 # Origin is top-left
 # D_w, D_c = 10, 25
@@ -84,7 +87,7 @@ class NetworkUnit:
                 db_request_queue.put((self.id, required_bw - total_current_bw))
 
 
-# TODO: Swati
+# TODO: Swati: Ask what the halving logic is 
 def assign_limits():
     for unit_id in db.database:
         pass
@@ -190,19 +193,70 @@ STEP 3: Make a group dictionary
 """
 # Maps group_id to a list of unit id 
 # every unit in the list is within D_w/ D_c of each other 
-group_dict = {}
+#  BFS-style flood fill 
 
-# TODO: Swati
-for unit_id in db.database:
+D_w = 10  # Distance threshold
+D_c = 25
+group_dict = {}  # Stores unit_id -> group_id mapping
+grid = defaultdict(set)  # Spatial hash map (grid-based indexing)
+group_id = 0  # Counter for group IDs
+
+def get_grid_cell(x, y, cell_size):
+    """Returns the grid cell coordinates for a given position."""
+    return (x // cell_size, y // cell_size)
+
+# Step 1: Populate the spatial grid
+for unit_id in db.database.items():
     unit = db.database[unit_id]
-    # find all the units < D_w and D_c apart and then add to group_dict
-    # Find another algo online
-    x,y = unit.position
+    x, y = unit.position
+    cell = get_grid_cell(x, y, D_w)
+    grid[cell].add(unit_id)
 
-        
+# Step 2: Group units by checking only nearby grid cells
+visited = set()
 
-# change unit.group_id 
+def assign_group(unit_id, x, y):
+    """Assigns a group ID to all units within D_w of the given unit."""
+    global group_id_counter
+    queue = deque([(unit_id, x, y)])
+    visited.add(unit_id)
+    group_dict[unit_id] = group_id_counter
+    db.database[unit_id].group_id = group_id_counter  # Update unit itself
 
+    while queue:
+        uid, ux, uy = queue.popleft()
+        cell_x, cell_y = get_grid_cell(ux, uy, D_w)
+
+        # Check this cell and 8 neighboring cells
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                neighbor_cell = (cell_x + dx, cell_y + dy)
+
+                for neighbor_id in grid.get(neighbor_cell, []):
+                    if neighbor_id not in visited:
+                        nx, ny = db.database[neighbor_id].position
+                        distance = math.sqrt((nx - ux) ** 2 + (ny - uy) ** 2)
+
+                        if db.database[unit_id].unit_type == UnitType.HS:
+                            if distance <= D_w:  # Within threshold
+                                visited.add(neighbor_id)
+                                group_dict[neighbor_id] = group_id_counter
+                                db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
+                                queue.append((neighbor_id, nx, ny))
+                        elif db.database[unit_id].unit_type == UnitType.BS:
+                            if distance <= D_c:  # Within threshold
+                                visited.add(neighbor_id)
+                                group_dict[neighbor_id] = group_id_counter
+                                db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
+                                queue.append((neighbor_id, nx, ny))
+
+    group_id_counter += 1  # Move to next group
+
+# Step 3: Process all units and assign groups
+for unit_id, unit in db.database.items():
+    if unit_id not in visited:
+        assign_group(unit_id, unit.position[0], unit.position[1])
+#TODO: add print statements to make sure this is working 
 
 """
 STEP 6: Allocate spectrum according to the rules for HS and BS based on distance 
