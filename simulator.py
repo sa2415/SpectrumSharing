@@ -151,7 +151,7 @@ def distance_based_sharing():
 
 
 """
-STEP 5: Congestion logic
+STEP 5: Congestion 
 """
 
 # Simulating congestion detection

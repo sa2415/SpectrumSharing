@@ -321,39 +321,27 @@ STEP 6: Allocate spectrum according to the rules for HS and BS based on distance
 # TODO: Swati
 def allocate_spectrum():
     # loop through database for each unit 
+    # ptr logic 
+    # TODO: once other function implemented: make sure it is within limit for each unit  
     for unit_id in db.database:
         unit = db.database[unit_id]
         if unit.group_id != None:
-            # ptr logic 
-            # make sure it is within limit for each unit  
-            pass
+            if unit.unit_type == UnitType.HS:
+                start_freq = db.wifi_ptr
+                end_freq = start_freq + req 
+                if end_freq <= db.wifi_freq_range[1]:
+                    db.wifi_ptr = end_freq
+                    unit.frequency_bands.append((start_freq, end_freq)) 
+            elif unit.unit_type == UnitType.BS:
+                start_freq = db.cellular_ptr
+                end_freq = start_freq + req 
+                if end_freq <= db.cellular_freq_range[1]:
+                    db.cellular_ptr = end_freq
+                    unit.frequency_bands.append((start_freq, end_freq)) 
         else:
             unit.frequency_bands = db.wifi_freq_range
-        # update unit.congestion
+        unit.congested = False
 
-    # if unit.unit_type == "Hotspot":
-    #     start_freq = db.wifi_ptr
-    #     end_freq = start_freq + req
-
-    #     if end_freq <= db.wifi_freq_range[1]:
-    #         unit.frequency_bands.append((start_freq, end_freq)) 
-    #         db.wifi_ptr = end_freq  
-    #         unit.status = "active"  
-    #         return True
-        
-    # elif unit.unit_type == "Base Station":
-    #     start_freq = db.cellular_ptr - req
-    #     end_freq = db.cellular_ptr
-
-    #     if start_freq >= db.cellular_freq_range[0]:
-    #         unit.frequency_bands.append((start_freq, end_freq))  
-    #         db.cellular_ptr = start_freq 
-    #         unit.status = "active" 
-    #         return True 
-        
-    # print(f"Unable to allocate spectrum to Unit {unit}, status: congested.")    
-    # unit.status = "congested" 
-    # return False
 
 
 def get_snapshot_duration(snapshot):
