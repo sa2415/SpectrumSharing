@@ -12,9 +12,7 @@ import math
 # Origin is top-left
 # D_w, D_c = 10, 25
 
-'''
-Available spectrum decreases if the distance is less than D_w/ D_c, with a halving of spectrum as distance approaches zero. (TODO)
-'''
+
 
 
 class UnitType(Enum):
@@ -35,11 +33,11 @@ class NetworkUnit:
 
     """
     STEP 4: Updating traffic demand according to population density and time of day
-
+    TODO: [Nicole] - acc to # of ppl, remove commuting hours 
                                           low         medium       high
     density = 0: [20, 50] MHz       --> [20,30],     [30,40],     [40,50]
     density = 1: [200, 500] MHz     --> [200,300],   [300,400],   [400,500]
-    density = 3: [2000, 5000] MHz   --> [2000,3000], [3000,4000], [4000,5000]
+    density = 2: [2000, 5000] MHz   --> [2000,3000], [3000,4000], [4000,5000]
 
     0:00 -  8:00 : low usage       (wifi:cell = 50:50)
     8:00 - 12:00 : high wifi usage (wifi:cell = 70:30)
@@ -129,15 +127,18 @@ class NetworkUnit:
                 db_request_queue.put((self.id, required_bw - total_current_bw))
 
 
-# TODO: Swati: Ask what the halving logic is 
-def assign_limits():
-    for unit_id in db.database:
-        pass
-    # Available spectrum decreases if the distance is less than D_w/ D_c, with a halving of spectrum as distance approaches zero.
-    pass
+
+def total_frequency_allocated(unit):
+    total = 0
+    for band in unit.frequency_bands:
+        total += band[1] - band[0]
+    return total
 
 """
 STEP 1: Create dat "map"!
+
+TODO: [Swati] - change population_density acc to time of day 
+Assign areas: Business, Residential, Shopping(Lunch)
 """
 
 city_size = (10, 10)
@@ -251,6 +252,7 @@ STEP 3: Make a group dictionary
 # Maps group_id to a list of unit id 
 # every unit in the list is within D_w/ D_c of each other 
 #  BFS-style flood fill 
+# A = 1/2, B =1/3, C = 1/2
 
 D_w = 10  # Distance threshold
 D_c = 25
@@ -263,7 +265,7 @@ def get_grid_cell(x, y, cell_size):
     return (x // cell_size, y // cell_size)
 
 # Step 1: Populate the spatial grid
-for unit_id in db.database.items():
+for unit_id in db.database:
     unit = db.database[unit_id]
     x, y = unit.position
     cell = get_grid_cell(x, y, D_w)
@@ -275,6 +277,7 @@ visited = set()
 def assign_group(unit_id, x, y):
     """Assigns a group ID to all units within D_w of the given unit."""
     global group_id_counter
+    group_id_counter = 0
     queue = deque([(unit_id, x, y)])
     visited.add(unit_id)
     group_dict[unit_id] = group_id_counter
@@ -319,28 +322,47 @@ for unit_id, unit in db.database.items():
 STEP 6: Allocate spectrum according to the rules for HS and BS based on distance 
 """
 # TODO: Swati
-def allocate_spectrum():
+def allocate_spectrum(unit, bandwidth):
     # loop through database for each unit 
     # ptr logic 
     # TODO: once other function implemented: make sure it is within limit for each unit  
-    for unit_id in db.database:
-        unit = db.database[unit_id]
-        if unit.group_id != None:
-            if unit.unit_type == UnitType.HS:
-                start_freq = db.wifi_ptr
-                end_freq = start_freq + req 
-                if end_freq <= db.wifi_freq_range[1]:
-                    db.wifi_ptr = end_freq
-                    unit.frequency_bands.append((start_freq, end_freq)) 
-            elif unit.unit_type == UnitType.BS:
-                start_freq = db.cellular_ptr
-                end_freq = start_freq + req 
-                if end_freq <= db.cellular_freq_range[1]:
-                    db.cellular_ptr = end_freq
-                    unit.frequency_bands.append((start_freq, end_freq)) 
-        else:
-            unit.frequency_bands = db.wifi_freq_range
-        unit.congested = False
+    # for unit_id in db.database:
+    #     unit = db.database[unit_id]
+    if unit.group_id != None:
+        unit.limit = total_frequency_allocated(unit)/len(group_dict[unit.group_id])
+        if unit.unit_type == UnitType.HS:
+            start_freq = db.wifi_ptr
+            end_freq = None
+            # check if the total frequency allocated to the unit is less than the limit
+            # limit is defined by number of units in the group
+            if total_frequency_allocated(unit) < unit.limit:
+                end_freq = start_freq + bandwidth 
+            else:
+                end_freq = None
+
+            if (end_freq != None) and (end_freq <= db.wifi_freq_range[1]):
+                db.wifi_ptr = end_freq
+                unit.frequency_bands.append((start_freq, end_freq)) 
+            else:
+                unit.congested = True
+
+        elif unit.unit_type == UnitType.BS:
+            start_freq = db.cellular_ptr
+            end_freq = None
+
+            if total_frequency_allocated(unit) < unit.limit:
+                end_freq = start_freq + bandwidth 
+            else:
+                end_freq = None
+
+            if (end_freq != None) and end_freq <= db.cellular_freq_range[1]:
+                db.cellular_ptr = end_freq
+                unit.frequency_bands.append((start_freq, end_freq)) 
+            else:
+                unit.congested = True
+    else:
+        unit.frequency_bands = db.wifi_freq_range
+    unit.congested = False
 
 
 

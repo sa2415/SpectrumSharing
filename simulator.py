@@ -263,3 +263,24 @@ plt.title("Dynamic Spectrum Allocation Performance")
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+
+
+def generate_report():
+    report = {
+        "spectrum_allocation": {},
+        "traffic_patterns": {},
+        "performance_metrics": {}
+    }
+    for unit in db.units.values():
+        report["spectrum_allocation"][unit.id] = unit.frequency
+        report["traffic_patterns"][unit.id] = unit.traffic_demand
+        report["performance_metrics"][unit.id] = {
+            "latency": unit.traffic_demand / (unit.connected_devices or 1),
+            "power_usage": unit.power,
+            "spectrum_efficiency": unit.traffic_demand / (unit.frequency or 1)
+        }
+    # Congestion = x more units needed - $$ ?
+    print("Final Report:", report)
+    return report
