@@ -7,13 +7,14 @@ from enum import Enum
 import queue
 from collections import defaultdict
 import math
+from scipy.spatial import KDTree
 
 
 # Origin is top-left
 # D_w, D_c = 10, 25
 
-
-
+D_w = 10  # Distance threshold
+D_c = 25
 
 class UnitType(Enum):
     BS = 0
@@ -52,7 +53,7 @@ class NetworkUnit:
         traffic_demand_bounds = {
             0: (20, 50),
             1: (200, 500),
-            3: (2000, 5000)
+            2: (2000, 5000)
         }
 
         # (snapshot, unit_type) --> traffic intensity level
@@ -71,7 +72,7 @@ class NetworkUnit:
             (5, UnitType.BS): "low",
         }
 
-        lower_bound, upper_bound = traffic_demand_bounds[self.density]
+        lower_bound, upper_bound = traffic_demand_bounds[int(self.density)]
         traffic_intensity = traffic_intensity[(snapshot, self.unit_type)]
 
         range_size = upper_bound - lower_bound
@@ -133,6 +134,48 @@ def total_frequency_allocated(unit):
     for band in unit.frequency_bands:
         total += band[1] - band[0]
     return total
+
+
+#--------------------------------- Debugging Functions ---------------------------------#
+# Calculate Euclidean distance between two units
+def calculate_distance(unit1, unit2):
+    x1, y1 = unit1.position
+    x2, y2 = unit2.position
+    return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+# Plotting function
+def plot_units():
+    # Create lists for x and y positions of BS units
+    bs_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.BS]
+    x_positions = [unit.position[0] for unit in bs_units]
+    y_positions = [unit.position[1] for unit in bs_units]
+
+    # Create a plot
+    plt.figure(figsize=(10, 10))
+    
+    # Plot all BS units in blue
+    plt.scatter(x_positions, y_positions, color='blue', label="BS Unit")
+    
+    # Check distance between units and color code them
+    for i, unit1 in enumerate(bs_units):
+        for j, unit2 in enumerate(bs_units):
+            if i < j:  # Avoid double counting
+                distance = calculate_distance(unit1, unit2)
+                if distance <= D_c:
+                    # If units are within D_w distance, color them in red
+                    plt.scatter([unit1.position[0], unit2.position[0]], 
+                                [unit1.position[1], unit2.position[1]], 
+                                color='red', label="Units within D_w" if i == 0 else "")
+    
+    # Label and show plot
+    plt.title(f"BS Units and Units within {D_c} Units Distance")
+    plt.xlabel("X Position")
+    plt.ylabel("Y Position")
+    plt.legend(loc="upper right")
+    plt.grid(True)
+    plt.show()
+
+#-----------------------------------------------------------------------------------#
 
 """
 STEP 1: Create dat "map"!
@@ -202,7 +245,7 @@ for i in range(city_size[0]):
     for j in range(city_size[1]):
         pop_density = population_density[i, j]
         traffic_demand = 0
-        #setting the number of hs and bs acc to density [TODO]
+        # setting the number of hs and bs acc to density [TODO]
         if pop_density == 2:
             hs_count = 10
             bs_count = 5
@@ -245,6 +288,7 @@ for i in range(city_size[0]):
             db.database[unit_id] = NetworkUnit(unit_id, (x_pos, y_pos), traffic_demand, UnitType.BS, pop_density) 
             unit_id += 1
 
+# plot_units()
 
 """
 STEP 3: Make a group dictionary 
@@ -254,8 +298,6 @@ STEP 3: Make a group dictionary
 #  BFS-style flood fill 
 # A = 1/2, B =1/3, C = 1/2
 
-D_w = 10  # Distance threshold
-D_c = 25
 group_dict = {}  # Stores unit_id -> group_id mapping
 grid = defaultdict(set)  # Spatial hash map (grid-based indexing)
 group_id = 0  # Counter for group IDs
@@ -272,50 +314,96 @@ for unit_id in db.database:
     grid[cell].add(unit_id)
 
 # Step 2: Group units by checking only nearby grid cells
-visited = set()
+# visited = set()
 
-def assign_group(unit_id, x, y):
-    """Assigns a group ID to all units within D_w of the given unit."""
-    global group_id_counter
-    group_id_counter = 0
-    queue = deque([(unit_id, x, y)])
-    visited.add(unit_id)
-    group_dict[unit_id] = group_id_counter
-    db.database[unit_id].group_id = group_id_counter  # Update unit itself
+# def assign_group():
+#     for unit_id1, unit1 in db.database.items():
+#         if unit1.unit_type == UnitType.BS:     
+#             group_dict[unit_id1] = []
+#             for unit_id2, unit2 in db.database.items():
+#                 if (unit2.unit_type == UnitType.BS) and (unit_id1 == unit_id2):
+#                     continue  
+#                 distance = calculate_distance(unit1, unit2)
+#                 if distance <= D_w:
+#                     group_dict[unit_id1].append(unit_id2)
+#         elif unit1.unit_type == UnitType.HS:     
+#             group_dict[unit_id1] = []
+#             for unit_id2, unit2 in db.database.items():
+#                 if (unit2.unit_type == UnitType.HS) and (unit_id1 == unit_id2):
+#                     continue  
+#                 distance = calculate_distance(unit1, unit2)
+#                 if distance <= D_c:
+#                     group_dict[unit_id1].append(unit_id2)
 
-    while queue:
-        uid, ux, uy = queue.popleft()
-        cell_x, cell_y = get_grid_cell(ux, uy, D_w)
 
-        # Check this cell and 8 neighboring cells
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                neighbor_cell = (cell_x + dx, cell_y + dy)
+def assign_group():
+    bs_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.BS]
+    hs_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.HS]
 
-                for neighbor_id in grid.get(neighbor_cell, []):
-                    if neighbor_id not in visited:
-                        nx, ny = db.database[neighbor_id].position
-                        distance = math.sqrt((nx - ux) ** 2 + (ny - uy) ** 2)
+    # Create k-d trees for BS and HS units
+    bs_positions = [unit.position for unit in bs_units]
+    hs_positions = [unit.position for unit in hs_units]
+    
+    bs_tree = KDTree(bs_positions)
+    hs_tree = KDTree(hs_positions)
+    
+    # For BS units
+    for i, unit in enumerate(bs_units):
+        # Query k-d tree for BS units within distance D_w
+        indices = bs_tree.query_ball_point(unit.position, D_w)  # Returns indices of nearby units
+        group_dict[unit.id] = [bs_units[i].id for i in indices if bs_units[i] != unit]  # Exclude itself
 
-                        if db.database[unit_id].unit_type == UnitType.HS:
-                            if distance <= D_w:  # Within threshold
-                                visited.add(neighbor_id)
-                                group_dict[neighbor_id] = group_id_counter
-                                db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
-                                queue.append((neighbor_id, nx, ny))
-                        elif db.database[unit_id].unit_type == UnitType.BS:
-                            if distance <= D_c:  # Within threshold
-                                visited.add(neighbor_id)
-                                group_dict[neighbor_id] = group_id_counter
-                                db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
-                                queue.append((neighbor_id, nx, ny))
+    # For HS units
+    for i, unit in enumerate(hs_units):
+        # Query k-d tree for HS units within distance D_c
+        indices = hs_tree.query_ball_point(unit.position, D_c)  # Returns indices of nearby units
+        group_dict[unit.id] = [hs_units[i].id for i in indices if hs_units[i] != unit]  # Exclude itself
 
-    group_id_counter += 1  # Move to next group
+    
+
+# def assign_group(unit_id, x, y):
+#     """Assigns a group ID to all units within D_w of the given unit."""
+#     global group_id_counter
+#     group_id_counter = 0
+#     queue = deque([(unit_id, x, y)])
+#     visited.add(unit_id)
+#     group_dict[unit_id] = group_id_counter
+#     db.database[unit_id].group_id = group_id_counter  # Update unit itself
+
+#     while queue:
+#         uid, ux, uy = queue.popleft()
+#         cell_x, cell_y = get_grid_cell(ux, uy, D_w)
+
+#         # Check this cell and 8 neighboring cells
+#         for dx in [-1, 0, 1]:
+#             for dy in [-1, 0, 1]:
+#                 neighbor_cell = (cell_x + dx, cell_y + dy)
+
+#                 for neighbor_id in grid.get(neighbor_cell, []):
+#                     if neighbor_id not in visited:
+#                         nx, ny = db.database[neighbor_id].position
+#                         distance = math.sqrt((nx - ux) ** 2 + (ny - uy) ** 2)
+
+#                         if db.database[unit_id].unit_type == UnitType.HS:
+#                             if distance <= D_w:  # Within threshold
+#                                 visited.add(neighbor_id)
+#                                 group_dict[neighbor_id] = group_id_counter
+#                                 db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
+#                                 queue.append((neighbor_id, nx, ny))
+#                         elif db.database[unit_id].unit_type == UnitType.BS:
+#                             if distance <= D_c:  # Within threshold
+#                                 visited.add(neighbor_id)
+#                                 group_dict[neighbor_id] = group_id_counter
+#                                 db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
+#                                 queue.append((neighbor_id, nx, ny))
+
+#     group_id_counter += 1  # Move to next group
 
 # Step 3: Process all units and assign groups
-for unit_id, unit in db.database.items():
-    if unit_id not in visited:
-        assign_group(unit_id, unit.position[0], unit.position[1])
+for unit_id in db.database.items():
+    # if unit_id not in visited:
+    assign_group()
+
 #TODO: add print statements to make sure this is working 
 
 """
@@ -364,6 +452,17 @@ def allocate_spectrum(unit, bandwidth):
         unit.frequency_bands = db.wifi_freq_range
     unit.congested = False
 
+def print_database_state(db):
+    """
+    Prints the current state of the database in a tabular format.
+    """
+    header = f"{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand':<15}{'Bands Allocated':<20}{'Congested':<10}{'Group ID':<10}{'Density':<10}{'Limit':<10}"
+    print(header)
+    print("-" * len(header))
+    for unit in db.database.values():
+        bands = ', '.join([f"({start:.2f}-{end:.2f})" for start, end in unit.frequency_bands])
+        print(f"{unit.id:<5}{unit.unit_type.name:<10}{str(unit.position):<15}{unit.traffic_demand:<15}{bands:<20}{str(unit.congested):<10}{str(unit.group_id):<10}{unit.density:<10}{str(unit.limit):<10}")
+    print("\n")
 
 
 def get_snapshot_duration(snapshot):
@@ -389,23 +488,41 @@ STEP 7: Simulation loop
 """
 def simulate_dynamic_allocation():
     for year in range(3):
+        print(f"\nStarting Year {year + 1}...\n")
         for day in range(365):
+            print(f"\n  Starting Day {day + 1}...\n")
             for snapshot in range(6):
+                print(f"    Snapshot {snapshot + 1}:")
                 for unit in db.database.values():
                     unit.update_traffic_demand(snapshot)            
                     unit.make_request(db.request_queue)
+                    # print(f"      Unit {unit.id}: Traffic Demand updated from {prev_demand} to {unit.traffic_demand}")
 
-                for hour in get_snapshot_duration(snapshot):
+                for hour in range(get_snapshot_duration(snapshot)):
                     while not db.request_queue.empty():  
                         request = db.request_queue.get()  
                         unit_id, bandwidth = request 
-                        unit = db.units.get(unit_id)
+                        unit = db.database[unit_id]
+                        # print(f"Request Queue: {list(db.request_queue.queue)}")
+                        # print("group_dict", group_dict)
                         print(f"Processing request for Unit {unit_id} requesting {bandwidth} Mbps spectrum.")
-                        allocate_spectrum(unit, bandwidth) # check - stored as a tuple with request as second term 
+                        allocate_spectrum(unit, bandwidth)
                         # request processed
                         db.request_queue.get()
                 db.update_ratios(snapshot)
+                # print(f"    Updated spectrum allocation ratios for snapshot {snapshot + 1}.")
+                print_database_state(db)
+           
     
         print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
         for unit in db.units.values():
             unit.traffic_demand *= 1.2
+
+
+simulate_dynamic_allocation()
+
+
+
+
+
+
