@@ -314,27 +314,6 @@ for unit_id in db.database:
     grid[cell].add(unit_id)
 
 # Step 2: Group units by checking only nearby grid cells
-# visited = set()
-
-# def assign_group():
-#     for unit_id1, unit1 in db.database.items():
-#         if unit1.unit_type == UnitType.BS:     
-#             group_dict[unit_id1] = []
-#             for unit_id2, unit2 in db.database.items():
-#                 if (unit2.unit_type == UnitType.BS) and (unit_id1 == unit_id2):
-#                     continue  
-#                 distance = calculate_distance(unit1, unit2)
-#                 if distance <= D_w:
-#                     group_dict[unit_id1].append(unit_id2)
-#         elif unit1.unit_type == UnitType.HS:     
-#             group_dict[unit_id1] = []
-#             for unit_id2, unit2 in db.database.items():
-#                 if (unit2.unit_type == UnitType.HS) and (unit_id1 == unit_id2):
-#                     continue  
-#                 distance = calculate_distance(unit1, unit2)
-#                 if distance <= D_c:
-#                     group_dict[unit_id1].append(unit_id2)
-
 
 def assign_group():
     bs_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.BS]
@@ -359,45 +338,6 @@ def assign_group():
         indices = hs_tree.query_ball_point(unit.position, D_c)  # Returns indices of nearby units
         group_dict[unit.id] = [hs_units[i].id for i in indices if hs_units[i] != unit]  
 
-    
-
-# def assign_group(unit_id, x, y):
-#     """Assigns a group ID to all units within D_w of the given unit."""
-#     global group_id_counter
-#     group_id_counter = 0
-#     queue = deque([(unit_id, x, y)])
-#     visited.add(unit_id)
-#     group_dict[unit_id] = group_id_counter
-#     db.database[unit_id].group_id = group_id_counter  # Update unit itself
-
-#     while queue:
-#         uid, ux, uy = queue.popleft()
-#         cell_x, cell_y = get_grid_cell(ux, uy, D_w)
-
-#         # Check this cell and 8 neighboring cells
-#         for dx in [-1, 0, 1]:
-#             for dy in [-1, 0, 1]:
-#                 neighbor_cell = (cell_x + dx, cell_y + dy)
-
-#                 for neighbor_id in grid.get(neighbor_cell, []):
-#                     if neighbor_id not in visited:
-#                         nx, ny = db.database[neighbor_id].position
-#                         distance = math.sqrt((nx - ux) ** 2 + (ny - uy) ** 2)
-
-#                         if db.database[unit_id].unit_type == UnitType.HS:
-#                             if distance <= D_w:  # Within threshold
-#                                 visited.add(neighbor_id)
-#                                 group_dict[neighbor_id] = group_id_counter
-#                                 db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
-#                                 queue.append((neighbor_id, nx, ny))
-#                         elif db.database[unit_id].unit_type == UnitType.BS:
-#                             if distance <= D_c:  # Within threshold
-#                                 visited.add(neighbor_id)
-#                                 group_dict[neighbor_id] = group_id_counter
-#                                 db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
-#                                 queue.append((neighbor_id, nx, ny))
-
-#     group_id_counter += 1  # Move to next group
 
 # Step 3: Process all units and assign groups
 for unit_id in db.database.items():
@@ -527,8 +467,66 @@ def simulate_dynamic_allocation():
 
 simulate_dynamic_allocation()
 
+#---------------------------- Alternate Functions -----------------------------#
+'''
+# Alternate function to assign groups using BFS
 
+# visited = set()
 
+# def assign_group():
+#     for unit_id1, unit1 in db.database.items():
+#         if unit1.unit_type == UnitType.BS:     
+#             group_dict[unit_id1] = []
+#             for unit_id2, unit2 in db.database.items():
+#                 if (unit2.unit_type == UnitType.BS) and (unit_id1 == unit_id2):
+#                     continue  
+#                 distance = calculate_distance(unit1, unit2)
+#                 if distance <= D_w:
+#                     group_dict[unit_id1].append(unit_id2)
+#         elif unit1.unit_type == UnitType.HS:     
+#             group_dict[unit_id1] = []
+#             for unit_id2, unit2 in db.database.items():
+#                 if (unit2.unit_type == UnitType.HS) and (unit_id1 == unit_id2):
+#                     continue  
+#                 distance = calculate_distance(unit1, unit2)
+#                 if distance <= D_c:
+#                     group_dict[unit_id1].append(unit_id2)
 
+def assign_group(unit_id, x, y):
+    """Assigns a group ID to all units within D_w of the given unit."""
+    global group_id_counter
+    group_id_counter = 0
+    queue = deque([(unit_id, x, y)])
+    visited.add(unit_id)
+    group_dict[unit_id] = group_id_counter
+    db.database[unit_id].group_id = group_id_counter  # Update unit itself
 
+    while queue:
+        uid, ux, uy = queue.popleft()
+        cell_x, cell_y = get_grid_cell(ux, uy, D_w)
 
+        # Check this cell and 8 neighboring cells
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                neighbor_cell = (cell_x + dx, cell_y + dy)
+
+                for neighbor_id in grid.get(neighbor_cell, []):
+                    if neighbor_id not in visited:
+                        nx, ny = db.database[neighbor_id].position
+                        distance = math.sqrt((nx - ux) ** 2 + (ny - uy) ** 2)
+
+                        if db.database[unit_id].unit_type == UnitType.HS:
+                            if distance <= D_w:  # Within threshold
+                                visited.add(neighbor_id)
+                                group_dict[neighbor_id] = group_id_counter
+                                db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
+                                queue.append((neighbor_id, nx, ny))
+                        elif db.database[unit_id].unit_type == UnitType.BS:
+                            if distance <= D_c:  # Within threshold
+                                visited.add(neighbor_id)
+                                group_dict[neighbor_id] = group_id_counter
+                                db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
+                                queue.append((neighbor_id, nx, ny))
+
+    group_id_counter += 1  # Move to next group
+'''
