@@ -351,13 +351,13 @@ def assign_group():
     for i, unit in enumerate(bs_units):
         # Query k-d tree for BS units within distance D_w
         indices = bs_tree.query_ball_point(unit.position, D_w)  # Returns indices of nearby units
-        group_dict[unit.id] = [bs_units[i].id for i in indices if bs_units[i] != unit]  # Exclude itself
+        group_dict[unit.id] = [bs_units[i].id for i in indices if bs_units[i] != unit]  
 
     # For HS units
     for i, unit in enumerate(hs_units):
         # Query k-d tree for HS units within distance D_c
         indices = hs_tree.query_ball_point(unit.position, D_c)  # Returns indices of nearby units
-        group_dict[unit.id] = [hs_units[i].id for i in indices if hs_units[i] != unit]  # Exclude itself
+        group_dict[unit.id] = [hs_units[i].id for i in indices if hs_units[i] != unit]  
 
     
 
@@ -452,17 +452,22 @@ def allocate_spectrum(unit, bandwidth):
         unit.frequency_bands = [db.wifi_freq_range]
     unit.congested = False
 
-def print_database_state(db):
+def print_database_state(db, group_dict):
     """
     Prints the current state of the database in a tabular format.
     """
-    header = f"{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand':<15}{'Bands Allocated':<20}{'Congested':<10}{'Group ID':<10}{'Density':<10}{'Limit':<10}"
+    header = f"{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand':<15}{'Bands Allocated':<20}{'Congested':<10}{'Group ID':<10}{'Density':<10}{'Limit':<10}{'Group Dict':<20}"
     print(header)
     print("-" * len(header))
+    
     for unit in db.database.values():
-        # print(f"Unit {unit.id} frequency bands: {unit.frequency_bands}")
         bands = ', '.join([f"({start:.2f}-{end:.2f})" for (start, end) in unit.frequency_bands])
-        print(f"{unit.id:<5}{unit.unit_type.name:<10}{str(unit.position):<15}{unit.traffic_demand:<15}{bands:<20}{str(unit.congested):<10}{str(unit.group_id):<10}{unit.density:<10}{str(unit.limit):<10}")
+        group_str = ', '.join(map(str, group_dict.get(unit.id, [])))  # Get group dict or empty list
+        
+        print(f"{unit.id:<5}{unit.unit_type.name:<10}{str(unit.position):<15}{unit.traffic_demand:<15}"
+              f"{bands:<20}{str(unit.congested):<10}{str(unit.group_id):<10}{unit.density:<10}{str(unit.limit):<10}"
+              f"{group_str:<20}")
+    
     print("\n")
 
 
@@ -509,14 +514,14 @@ def simulate_dynamic_allocation():
                         # print(f"Processing request for Unit {unit_id} requesting {bandwidth} Mbps spectrum.")
                         allocate_spectrum(unit, bandwidth)
                         # request processed
-                        db.request_queue.get()
+                        # db.request_queue.get()
                 db.update_ratios(snapshot)
                 # print(f"    Updated spectrum allocation ratios for snapshot {snapshot + 1}.")
-                print_database_state(db)
+                print_database_state(db, group_dict)
            
     
         print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
-        for unit in db.units.values():
+        for unit in db.database.values():
             unit.traffic_demand *= 1.2
 
 
