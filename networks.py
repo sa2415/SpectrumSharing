@@ -238,8 +238,8 @@ STEP 2: Placing BS and HS
 """
 db = Database()
 unit_id = 0
-block_size = 100
-grid_size = 1000
+block_size = 50
+grid_size = 100
 
 for i in range(city_size[0]):
     for j in range(city_size[1]):
@@ -247,14 +247,14 @@ for i in range(city_size[0]):
         traffic_demand = 0
         # setting the number of hs and bs acc to density [TODO]
         if pop_density == 2:
-            hs_count = 10
-            bs_count = 5
+            hs_count = 2  #10
+            bs_count = 1  #5
         elif pop_density == 1:
-            hs_count = 5
-            bs_count = 2
+            hs_count = 0   #5
+            bs_count = 0   #2
         else:
-            hs_count = 3
-            bs_count = 1
+            hs_count = 0  #3
+            bs_count = 0  #1
 
         coordinates = set()
         for _ in range (hs_count):
@@ -449,7 +449,7 @@ def allocate_spectrum(unit, bandwidth):
             else:
                 unit.congested = True
     else:
-        unit.frequency_bands = db.wifi_freq_range
+        unit.frequency_bands = [db.wifi_freq_range]
     unit.congested = False
 
 def print_database_state(db):
@@ -460,7 +460,8 @@ def print_database_state(db):
     print(header)
     print("-" * len(header))
     for unit in db.database.values():
-        bands = ', '.join([f"({start:.2f}-{end:.2f})" for start, end in unit.frequency_bands])
+        # print(f"Unit {unit.id} frequency bands: {unit.frequency_bands}")
+        bands = ', '.join([f"({start:.2f}-{end:.2f})" for (start, end) in unit.frequency_bands])
         print(f"{unit.id:<5}{unit.unit_type.name:<10}{str(unit.position):<15}{unit.traffic_demand:<15}{bands:<20}{str(unit.congested):<10}{str(unit.group_id):<10}{unit.density:<10}{str(unit.limit):<10}")
     print("\n")
 
@@ -489,7 +490,7 @@ STEP 7: Simulation loop
 def simulate_dynamic_allocation():
     for year in range(3):
         print(f"\nStarting Year {year + 1}...\n")
-        for day in range(365):
+        for day in range(3):
             print(f"\n  Starting Day {day + 1}...\n")
             for snapshot in range(6):
                 print(f"    Snapshot {snapshot + 1}:")
@@ -503,9 +504,9 @@ def simulate_dynamic_allocation():
                         request = db.request_queue.get()  
                         unit_id, bandwidth = request 
                         unit = db.database[unit_id]
-                        # print(f"Request Queue: {list(db.request_queue.queue)}")
+                        print(f"Request Queue: {list(db.request_queue.queue)}")
                         # print("group_dict", group_dict)
-                        print(f"Processing request for Unit {unit_id} requesting {bandwidth} Mbps spectrum.")
+                        # print(f"Processing request for Unit {unit_id} requesting {bandwidth} Mbps spectrum.")
                         allocate_spectrum(unit, bandwidth)
                         # request processed
                         db.request_queue.get()
