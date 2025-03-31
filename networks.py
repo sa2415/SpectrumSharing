@@ -131,6 +131,7 @@ class NetworkUnit:
 
 def total_frequency_allocated(unit):
     total = 0
+    # print (f"Unit {unit.id} frequency bands: {unit.frequency_bands}")
     for band in unit.frequency_bands:
         total += band[1] - band[0]
     return total
@@ -314,7 +315,6 @@ for unit_id in db.database:
     grid[cell].add(unit_id)
 
 # Step 2: Group units by checking only nearby grid cells
-
 def assign_group():
     bs_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.BS]
     hs_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.HS]
@@ -351,31 +351,33 @@ STEP 6: Allocate spectrum according to the rules for HS and BS based on distance
 """
 # TODO: Swati
 def allocate_spectrum(unit, bandwidth):
-    # loop through database for each unit 
-    # ptr logic 
     # TODO: once other function implemented: make sure it is within limit for each unit  
     # for unit_id in db.database:
     #     unit = db.database[unit_id]
-    if unit.group_id != None:
-        unit.limit = total_frequency_allocated(unit)/len(group_dict[unit.group_id])
+    if len(group_dict[unit.id]) > 0:
         if unit.unit_type == UnitType.HS:
-            start_freq = db.wifi_ptr
+            unit.limit = int((db.wifi_freq_range[1]-db.wifi_freq_range[0])/len(group_dict[unit.id]))
+            # print(f"Unit {unit.id} limit: {unit.limit} len(group_dict[unit.group_id]): {len(group_dict[unit.id])}  total_frequency_allocated: {total_frequency_allocated(unit)}")
+            start_freq = db.wifi_ptr*1000
             end_freq = None
             # check if the total frequency allocated to the unit is less than the limit
             # limit is defined by number of units in the group
             if total_frequency_allocated(unit) < unit.limit:
-                end_freq = start_freq + bandwidth 
+                print(f"Unit {unit.id} allocated bandwidth: {bandwidth/1000}")
+                end_freq = (start_freq) + bandwidth 
             else:
                 end_freq = None
 
             if (end_freq != None) and (end_freq <= db.wifi_freq_range[1]):
-                db.wifi_ptr = end_freq
+                db.wifi_ptr = (end_freq)
                 unit.frequency_bands.append((start_freq, end_freq)) 
             else:
                 unit.congested = True
 
         elif unit.unit_type == UnitType.BS:
-            start_freq = db.cellular_ptr
+            unit.limit = int((db.cellular_freq_range[1]-db.cellular_freq_range[0]) /len(group_dict[unit.id]))
+            # print(f"Unit {unit.id} limit: {unit.limit} len(group_dict[unit.group_id]): {len(group_dict[unit.id])}  total_frequency_allocated: {total_frequency_allocated(unit)}")
+            start_freq = db.cellular_ptr*1000
             end_freq = None
 
             if total_frequency_allocated(unit) < unit.limit:
@@ -384,12 +386,13 @@ def allocate_spectrum(unit, bandwidth):
                 end_freq = None
 
             if (end_freq != None) and end_freq <= db.cellular_freq_range[1]:
-                db.cellular_ptr = end_freq
+                db.cellular_ptr = (end_freq)
                 unit.frequency_bands.append((start_freq, end_freq)) 
             else:
                 unit.congested = True
     else:
-        unit.frequency_bands = [db.wifi_freq_range]
+        unit.frequency_bands = [db.wifi_freq_range] if unit.unit_type == UnitType.HS else [db.cellular_freq_range]
+        unit.limit = int(db.cellular_freq_range[1]-db.cellular_freq_range[0]) if unit.unit_type == UnitType.BS else int(db.wifi_freq_range[1]-db.wifi_freq_range[0])
     unit.congested = False
 
 def print_database_state(db, group_dict):
@@ -437,7 +440,7 @@ def simulate_dynamic_allocation():
         print(f"\nStarting Year {year + 1}...\n")
         for day in range(3):
             print(f"\n  Starting Day {day + 1}...\n")
-            for snapshot in range(6):
+            for snapshot in range(2):
                 print(f"    Snapshot {snapshot + 1}:")
                 for unit in db.database.values():
                     unit.update_traffic_demand(snapshot)            
@@ -449,7 +452,7 @@ def simulate_dynamic_allocation():
                         request = db.request_queue.get()  
                         unit_id, bandwidth = request 
                         unit = db.database[unit_id]
-                        print(f"Request Queue: {list(db.request_queue.queue)}")
+                        # print(f"Request Queue: {list(db.request_queue.queue)}")
                         # print("group_dict", group_dict)
                         # print(f"Processing request for Unit {unit_id} requesting {bandwidth} Mbps spectrum.")
                         allocate_spectrum(unit, bandwidth)
