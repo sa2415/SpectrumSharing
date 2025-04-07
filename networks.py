@@ -343,7 +343,6 @@ def assign_group():
 
 # Step 3: Process all units and assign groups
 for unit_id in db.database.items():
-    # if unit_id not in visited:
     assign_group()
 
 #TODO: add print statements to make sure this is working 
@@ -364,17 +363,21 @@ def allocate_spectrum(unit, bandwidth):
             # check if the total frequency allocated to the unit is less than the limit
             # limit is defined by number of units in the group
             if total_frequency_allocated(unit) < unit.limit:
-                print(f"Unit {unit.id} total frequency allocated: {total_frequency_allocated(unit)}, limit: {unit.limit}")
+                # print(f"Unit {unit.id} total frequency allocated: {total_frequency_allocated(unit)}, limit: {unit.limit}")
                 end_freq = start_freq + bandwidth/1000
-                print(f"start_freq: {start_freq}, end_freq: {end_freq}, bandwidth: {bandwidth/1000}")
+                # print(f"start_freq: {start_freq}, end_freq: {end_freq}, bandwidth: {bandwidth/1000}")
             else:
-                end_freq = None
+                end_freq = unit.limit
+                print(f"Request greater than limit: {unit.limit}, total frequency allocated: {total_frequency_allocated(unit)}")
 
+    
             if (end_freq != None) and (end_freq <= db.wifi_freq_range[1]):
                 db.wifi_ptr = end_freq
-                unit.frequency_bands.append((start_freq, end_freq)) 
             else:
+                db.wifi_ptr = end_freq
                 unit.congested = True
+
+            unit.frequency_bands.append((start_freq, end_freq)) 
 
         elif unit.unit_type == UnitType.BS:
             unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]) /(len(group_dict[unit.id])+1), 5)
@@ -385,16 +388,19 @@ def allocate_spectrum(unit, bandwidth):
                 # print(f"Unit {unit.id} allocated bandwidth: {bandwidth/1000}")
                 end_freq = start_freq + bandwidth/1000
             else:
-                end_freq = None
+                end_freq = unit.limit
+                print(f"Request greater than limit: {unit.limit}, total frequency allocated: {total_frequency_allocated(unit)}")
 
             if (end_freq != None) and end_freq <= db.cellular_freq_range[1]:
                 db.cellular_ptr = end_freq
-                unit.frequency_bands.append((start_freq, end_freq)) 
             else:
+                db.cellular_ptr = end_freq
                 unit.congested = True
+            unit.frequency_bands.append((start_freq, end_freq)) 
+
     else:
         unit.frequency_bands = [db.wifi_freq_range] if unit.unit_type == UnitType.HS else [db.cellular_freq_range]
-        unit.limit = int(db.cellular_freq_range[1]-db.cellular_freq_range[0]) if unit.unit_type == UnitType.BS else int(db.wifi_freq_range[1]-db.wifi_freq_range[0])
+        unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]), 3) if unit.unit_type == UnitType.BS else round((db.wifi_freq_range[1]-db.wifi_freq_range[0]), 3)
         unit.congested = False
 
 def print_database_state(db, group_dict):
