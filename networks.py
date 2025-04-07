@@ -53,8 +53,8 @@ class NetworkUnit:
         
         # pop density --> (lower, upper) traffic demand bound for the unit
         traffic_demand_bounds = {
-            0: (1, 5),
-            1: (6, 10),
+            0: (20, 50),
+            1: (200, 500),
             2: (20, 50)
         }
 
@@ -89,7 +89,7 @@ class NetworkUnit:
             case "high":
                 lower_bound = upper_bound - third
 
-        return random.randint(lower_bound, upper_bound)
+        return random.randint(lower_bound, upper_bound) #uniform distribution
 
     def update_traffic_demand(self, snapshot):
         self.traffic_demand = self.calculate_traffic_demand(snapshot)
@@ -118,7 +118,7 @@ class NetworkUnit:
         else:
             total_traffic_capacity = 0
             total_current_bw = 0
-            for band in self.frequency_bands:
+            for band in self.frequency_bands: # (6.5, 6.6)
                 band_bw = (band[1] - band[0]) * 1000 # multiply by 1000 to convert Ghz to MHz
                 band_traffic_capacity = band_bw / 2
                 total_current_bw += band_bw
@@ -506,12 +506,14 @@ def generate_report(year):
         for unit_id in bs_congestion:
             total_unserviced_traffic_demand_bs += bs_congestion[unit_id]
 
-        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Hotspots: {total_unserviced_traffic_demand_hs}\n")
+        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Hotspots: {total_unserviced_traffic_demand_hs}")
+        f.write(f"\nAvg Unserviced Traffic Demand (Mbps) per Hotspot: {total_unserviced_traffic_demand_hs / total_num_hs}\n")
         for unit_id in hs_congestion:
             x, y = db.database[unit_id].position
             f.write(f"Unit {unit_id} Pos {(x, y)}: {hs_congestion[unit_id]}\n")
         
-        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Base Stations: {total_unserviced_traffic_demand_bs}\n")
+        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Base Stations: {total_unserviced_traffic_demand_bs}")
+        f.write(f"\nAvg Unserviced Traffic Demand (Mbps) per Base Station: {total_unserviced_traffic_demand_bs / total_num_bs}\n")
         for unit_id in bs_congestion:
             x, y = db.database[unit_id].position
             f.write(f"Unit {unit_id} Pos {(x, y)}: {bs_congestion[unit_id]}\n")

@@ -14,6 +14,29 @@ TODO:
     - sometimes there are bands allocated that are covered by other allocated bands for that unit
         - e.g.  (6.85-6.87) (6.84-6.90)  
 - aggregate excess unserviced traffic demand based on grid block instead of per unit
+- fix allocate_spectrum problem where it allocates bands above the U6_END
+
+
+notes:
+- device in middle gets 1/3 spectrum, don't try to figure out which third
+- 2 on end give half, don't try to figure out which half
+- instead of assigneing 1/3, 1/3, 1/3, only assign limits if total demand for the group
+    exceeds sthe capacity of the unit's spectrum range and base the divisoin
+    off of the desired traffic demand ratios between the units
+
+1. We want spectrum for device X
+2. Figure out how much spectrum is needed to meet the demands of device X and all of its neighbors.
+3. Figure out how much spectrum is available to device X
+4. Get former / latter
+5. Assign device X (the above ratio) * (the spectrum that X wants)
+
+
+measures:
+- how many devices got everything they want
+- what fraction of total demands were met
+    - Fraction of total demand met = (sum of spectrum allocated over all devices) / (sum of spectrum desired over all devices)
+    - Fraction total demand met cellular vs same for wifi
+
 
 =================================================
 =================================================
