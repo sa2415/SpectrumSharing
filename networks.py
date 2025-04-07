@@ -51,9 +51,9 @@ class NetworkUnit:
         
         # pop density --> (lower, upper) traffic demand bound for the unit
         traffic_demand_bounds = {
-            0: (20, 50),
-            1: (200, 500),
-            2: (2000, 5000)
+            0: (1, 5),
+            1: (6, 10),
+            2: (11, 20)
         }
 
         # (snapshot, unit_type) --> traffic intensity level
@@ -125,7 +125,7 @@ class NetworkUnit:
             if self.traffic_demand > total_traffic_capacity:
                 # make a request to DB using excess traffic
                 assert required_bw > total_current_bw, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= total_current_bw."
-                print(f"Unit {self.id} made a request to DB for more spectrum: {(required_bw - total_current_bw)/1000} Mbps")
+                print (f"Unit {self.id} made a request to DB for more spectrum: {required_bw - total_current_bw} MHz")
                 db_request_queue.put((self.id, required_bw - total_current_bw)) 
 
 
@@ -353,39 +353,42 @@ STEP 6: Allocate spectrum according to the rules for HS and BS based on distance
 """
 # TODO: Swati
 def allocate_spectrum(unit, bandwidth):
-    # TODO: once other function implemented: make sure it is within limit for each unit  
+    unit.congested = False
+
     if len(group_dict[unit.id]) > 0:
         if unit.unit_type == UnitType.HS:
-            unit.limit = int((db.wifi_freq_range[1]-db.wifi_freq_range[0])/(len(group_dict[unit.id])+1))
+            unit.limit = round((db.wifi_freq_range[1]-db.wifi_freq_range[0])/(len(group_dict[unit.id])+1), 5)
+            # print(f"Unit {unit.id} limit: {unit.limit}, db.wifi_freq_range: {db.wifi_freq_range}, group_dict: {len(group_dict[unit.id])}")
             start_freq = db.wifi_ptr
             end_freq = None
             # check if the total frequency allocated to the unit is less than the limit
             # limit is defined by number of units in the group
             if total_frequency_allocated(unit) < unit.limit:
-                # print(f"Unit {unit.id} allocated bandwidth: {bandwidth/1000}")
-                end_freq = (start_freq) + bandwidth
+                print(f"Unit {unit.id} total frequency allocated: {total_frequency_allocated(unit)}, limit: {unit.limit}")
+                end_freq = start_freq + bandwidth/1000
+                print(f"start_freq: {start_freq}, end_freq: {end_freq}, bandwidth: {bandwidth/1000}")
             else:
                 end_freq = None
 
             if (end_freq != None) and (end_freq <= db.wifi_freq_range[1]):
-                db.wifi_ptr = (end_freq)
+                db.wifi_ptr = end_freq
                 unit.frequency_bands.append((start_freq, end_freq)) 
             else:
                 unit.congested = True
 
         elif unit.unit_type == UnitType.BS:
-            unit.limit = int((db.cellular_freq_range[1]-db.cellular_freq_range[0]) /(len(group_dict[unit.id])+1))
+            unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]) /(len(group_dict[unit.id])+1), 5)
             start_freq = db.cellular_ptr
             end_freq = None
 
             if total_frequency_allocated(unit) < unit.limit:
                 # print(f"Unit {unit.id} allocated bandwidth: {bandwidth/1000}")
-                end_freq = start_freq + bandwidth
+                end_freq = start_freq + bandwidth/1000
             else:
                 end_freq = None
 
             if (end_freq != None) and end_freq <= db.cellular_freq_range[1]:
-                db.cellular_ptr = (end_freq)
+                db.cellular_ptr = end_freq
                 unit.frequency_bands.append((start_freq, end_freq)) 
             else:
                 unit.congested = True
