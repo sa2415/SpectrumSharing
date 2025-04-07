@@ -395,7 +395,7 @@ def allocate_spectrum(unit, bandwidth):
     else:
         unit.frequency_bands = [db.wifi_freq_range] if unit.unit_type == UnitType.HS else [db.cellular_freq_range]
         unit.limit = int(db.cellular_freq_range[1]-db.cellular_freq_range[0]) if unit.unit_type == UnitType.BS else int(db.wifi_freq_range[1]-db.wifi_freq_range[0])
-    unit.congested = False
+        unit.congested = False
 
 def print_database_state(db, group_dict):
     """
