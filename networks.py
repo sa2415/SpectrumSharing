@@ -40,8 +40,8 @@ class NetworkUnit:
     density = 1: [200, 500] MHz     --> [200,300],   [300,400],   [400,500]
     density = 2: [2000, 5000] MHz   --> [2000,3000], [3000,4000], [4000,5000]
 
-    0:00 -  8:00 : low usage       (wifi:cell = 50:50)
-    8:00 - 12:00 : high wifi usage (wifi:cell = 70:30)
+     0:00 -  8:00 : low usage       (wifi:cell = 50:50)
+     8:00 - 12:00 : high wifi usage (wifi:cell = 70:30)
     12:00 - 15:00 : high cell usage (wifi:cell = 30:70)
     15:00 - 17:00 : high wifi usage (wifi:cell = 80:20)
     17:00 - 19:00 : high cell usage (wifi:cell = 40:60)

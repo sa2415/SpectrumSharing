@@ -1,3 +1,24 @@
+
+meeting notes 3/31
+
+- by time, or by geography
+- simplest strat: through all time through all area, this fraction goes to wifi and this fraction goes to cellular
+- metrics   
+    - # wifi HS where desired is achieved / # total hotspots
+    - sum over all HS (data rate acheived) / sum over all HS (data rate desired)
+    - ^same for cellular
+    
+
+
+
+
+
+=================================================
+=================================================
+=================================================
+
+
+
 meeting notes from 2/28
 - to prevent interference willn ot put cell and wifi device within distance d of each other
 - for now ignore interference
