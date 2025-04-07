@@ -27,7 +27,7 @@ class NetworkUnit:
         self.id = id
         self.position = position
         self.traffic_demand = traffic_demand # units = MHz
-        self.frequency_bands = [] # list of tuples (start_freq, end_freq)
+        self.frequency_bands = set() # list of tuples (start_freq, end_freq)
         self.congested = False
         self.unit_type = unit_type
         self.group_id = None
@@ -55,7 +55,7 @@ class NetworkUnit:
         traffic_demand_bounds = {
             0: (1, 5),
             1: (6, 10),
-            2: (11, 20)
+            2: (20, 50)
         }
 
         # (snapshot, unit_type) --> traffic intensity level
@@ -124,7 +124,7 @@ class NetworkUnit:
                 total_current_bw += band_bw
                 total_traffic_capacity += band_traffic_capacity
             
-            if self.traffic_demand > total_traffic_capacity:
+            if (self.traffic_demand - total_traffic_capacity) >= 10:
                 # make a request to DB using excess traffic
                 assert required_bw > total_current_bw, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= total_current_bw."
                 print (f"Unit {self.id} made a request to DB for more spectrum: {required_bw - total_current_bw} MHz")
@@ -252,8 +252,8 @@ for i in range(city_size[0]):
         traffic_demand = 0
         # setting the number of hs and bs acc to density [TODO]
         if pop_density == 2:
-            hs_count = 2  #10
-            bs_count = 1  #5
+            hs_count = 10  #10
+            bs_count = 5 #5
         elif pop_density == 1:
             hs_count = 0   #5
             bs_count = 0   #2
@@ -369,17 +369,15 @@ def allocate_spectrum(unit, bandwidth):
                 end_freq = start_freq + bandwidth/1000
                 # print(f"start_freq: {start_freq}, end_freq: {end_freq}, bandwidth: {bandwidth/1000}")
             else:
-                end_freq = unit.limit
+                end_freq = min(start_freq + unit.limit, db.wifi_freq_range[1])
                 print(f"Request greater than limit: {unit.limit}, total frequency allocated: {total_frequency_allocated(unit)}")
 
-    
             if (end_freq != None) and (end_freq <= db.wifi_freq_range[1]):
                 db.wifi_ptr = end_freq
             else:
-                db.wifi_ptr = end_freq
                 unit.congested = True
 
-            unit.frequency_bands.append((start_freq, end_freq)) 
+            unit.frequency_bands.add((start_freq, end_freq)) 
 
         elif unit.unit_type == UnitType.BS:
             unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]) /(len(group_dict[unit.id])+1), 5)
@@ -390,18 +388,25 @@ def allocate_spectrum(unit, bandwidth):
                 # print(f"Unit {unit.id} allocated bandwidth: {bandwidth/1000}")
                 end_freq = start_freq + bandwidth/1000
             else:
-                end_freq = unit.limit
+                end_freq = min(start_freq + unit.limit, db.cellular_freq_range[1])
                 print(f"Request greater than limit: {unit.limit}, total frequency allocated: {total_frequency_allocated(unit)}")
 
             if (end_freq != None) and end_freq <= db.cellular_freq_range[1]:
                 db.cellular_ptr = end_freq
             else:
-                db.cellular_ptr = end_freq
                 unit.congested = True
-            unit.frequency_bands.append((start_freq, end_freq)) 
+            
+            unit.frequency_bands.add((start_freq, end_freq)) 
 
     else:
-        unit.frequency_bands = [db.wifi_freq_range] if unit.unit_type == UnitType.HS else [db.cellular_freq_range]
+        # print(type(db.wifi_freq_range))
+        # print(db.wifi_freq_range)
+        # print(type(db.cellular_freq_range))
+        # print(db.cellular_freq_range)
+        if unit.unit_type == UnitType.HS:
+            unit.frequency_bands.add(db.wifi_freq_range)
+        else:
+            unit.frequency_bands.add(db.cellular_freq_range)
         unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]), 3) if unit.unit_type == UnitType.BS else round((db.wifi_freq_range[1]-db.wifi_freq_range[0]), 3)
         unit.congested = False
 
@@ -414,7 +419,10 @@ def print_database_state(db, group_dict):
     print("-" * len(header))
 
     for unit in db.database.values():
-        bands_list = [f"({start:.2f}-{end:.2f})" for (start, end) in unit.frequency_bands]
+        bands_list = []
+        for band in unit.frequency_bands:
+            start, end = band[0], band[1]
+            bands_list.append(f"({start:.2f}-{end:.2f})")
         
         # Split bands over multiple lines if too many
         max_bands_per_line = 4
@@ -500,11 +508,13 @@ def generate_report(year):
 
         f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Hotspots: {total_unserviced_traffic_demand_hs}\n")
         for unit_id in hs_congestion:
-            f.write(f"Unit {unit_id}: {hs_congestion[unit_id]}\n")
+            x, y = db.database[unit_id].position
+            f.write(f"Unit {unit_id} Pos {(x, y)}: {hs_congestion[unit_id]}\n")
         
         f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Base Stations: {total_unserviced_traffic_demand_bs}\n")
         for unit_id in bs_congestion:
-            f.write(f"Unit {unit_id}: {bs_congestion[unit_id]}\n")
+            x, y = db.database[unit_id].position
+            f.write(f"Unit {unit_id} Pos {(x, y)}: {bs_congestion[unit_id]}\n")
 
         f.write(f"\n=============================================================================\n")
         f.write(f"=============================================================================\n")
@@ -520,6 +530,8 @@ def simulate_dynamic_allocation():
             print(f"\n  Starting Day {day + 1}...\n")
             for snapshot in range(2):
                 print(f"    Snapshot {snapshot + 1}:")
+                print(f"db.wifi_freq_range: {db.wifi_freq_range}")
+                print(f"db.cellular_freq_range: {db.cellular_freq_range}")
                 for unit in db.database.values():
                     unit.update_traffic_demand(snapshot)            
                     unit.make_request(db.request_queue)
