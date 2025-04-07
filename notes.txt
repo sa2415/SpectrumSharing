@@ -5,6 +5,16 @@ Q: For what ranges does the traffic demand actually make sense
     - causing the requests to be very large (in GHz)
 - check values for traffic_demand_bounds inside calculate_traffic_demand
 
+Q: report generation (how much traffic demand requires a new unit)
+
+TODO:
+- fix pointer logic 
+    - sometimes there is start_freq == end_freq
+        - e.g. (6.85-6.85)
+    - sometimes there are bands allocated that are covered by other allocated bands for that unit
+        - e.g.  (6.85-6.87) (6.84-6.90)  
+- aggregate excess unserviced traffic demand based on grid block instead of per unit
+
 =================================================
 =================================================
 =================================================
