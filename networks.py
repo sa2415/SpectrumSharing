@@ -13,6 +13,8 @@ from scipy.spatial import KDTree
 # Origin is top-left
 # D_w, D_c = 10, 25
 
+report_file_path = "report.log"
+
 D_w = 10  # Distance threshold
 D_c = 25
 
@@ -36,9 +38,9 @@ class NetworkUnit:
     STEP 4: Updating traffic demand according to population density and time of day
     TODO: [Nicole] - acc to # of ppl, remove commuting hours 
                                           low         medium       high
-    density = 0: [20, 50] MHz       --> [20,30],     [30,40],     [40,50]
-    density = 1: [200, 500] MHz     --> [200,300],   [300,400],   [400,500]
-    density = 2: [2000, 5000] MHz   --> [2000,3000], [3000,4000], [4000,5000]
+    density = 0: [20, 50] Mbps       --> [20,30],     [30,40],     [40,50]
+    density = 1: [200, 500] Mbps     --> [200,300],   [300,400],   [400,500]
+    density = 2: [2000, 5000] Mbps   --> [2000,3000], [3000,4000], [4000,5000]
 
     0:00 -  8:00 : low usage       (wifi:cell = 50:50)
     8:00 - 12:00 : high wifi usage (wifi:cell = 70:30)
@@ -131,7 +133,7 @@ class NetworkUnit:
 
 
 def total_frequency_allocated(unit):
-    total = 0
+    total = 0.0
     # print (f"Unit {unit.id} frequency bands: {unit.frequency_bands}")
     for band in unit.frequency_bands:
         total += band[1] - band[0]
@@ -407,7 +409,7 @@ def print_database_state(db, group_dict):
     """
     Prints the current state of the database in a tabular format.
     """
-    header = f"{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand':<30}{'Bands Allocated':<45}{'Congested':<10}{'Density':<10}{'Limit':<10}{'Group Dict':<20}"
+    header = f"\n\n\n{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand (Mbps)':<30}{'Bands Allocated (GHz)':<45}{'Congested':<10}{'Density':<10}{'Limit':<10}{'Group Members':<20}"
     print(header)
     print("-" * len(header))
 
@@ -449,6 +451,65 @@ def get_snapshot_duration(snapshot):
         case 5: return 5
     return 0
 
+def calc_unserviced_traffic_demand(unit):
+    desired_bw = unit.traffic_demand * 2
+    allocated_bw = total_frequency_allocated(unit)
+    assert(desired_bw > allocated_bw)
+    unserviced_bw = (desired_bw - allocated_bw) * 1000 # convert from Ghz to MHz
+    unserviced_traffic_demand = unserviced_bw / 2
+    return unserviced_traffic_demand
+    
+def generate_report(year):
+    with open(report_file_path, "a") as f:
+        f.write(f"\n\n\n=============================================================================\n")
+        f.write(f"================================== Year {year} ==================================\n")
+        f.write(f"=============================================================================\n")
+
+        total_num_hs, num_congested_hs = 0, 0
+        total_num_bs, num_congested_bs = 0, 0
+
+        hs_congestion = {}
+        bs_congestion = {}
+
+        for unit in db.database.values():
+            if unit.unit_type == UnitType.HS:
+                total_num_hs += 1
+                if unit.congested:
+                    num_congested_hs += 1
+                    hs_congestion[unit.id] = calc_unserviced_traffic_demand(unit)
+
+            elif unit.unit_type == UnitType.BS:
+                total_num_bs += 1
+                if unit.congested:
+                    num_congested_bs += 1
+                    bs_congestion[unit.id] = calc_unserviced_traffic_demand(unit)
+        
+        congested_bs = 100 * num_congested_bs / total_num_bs
+        congested_hs = 100 * num_congested_hs / total_num_hs
+
+        f.write(f"Percentage of congested Hotspots: {congested_hs}%\n")
+        f.write(f"Percentage of congested Base Stations: {congested_bs}%\n")
+
+        total_unserviced_traffic_demand_hs = 0
+        for unit_id in hs_congestion:
+            total_unserviced_traffic_demand_hs += hs_congestion[unit_id]
+
+        total_unserviced_traffic_demand_bs = 0
+        for unit_id in bs_congestion:
+            total_unserviced_traffic_demand_bs += bs_congestion[unit_id]
+
+        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Hotspots: {total_unserviced_traffic_demand_hs}\n")
+        for unit_id in hs_congestion:
+            f.write(f"Unit {unit_id}: {hs_congestion[unit_id]}\n")
+        
+        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Base Stations: {total_unserviced_traffic_demand_bs}\n")
+        for unit_id in bs_congestion:
+            f.write(f"Unit {unit_id}: {bs_congestion[unit_id]}\n")
+
+        f.write(f"\n=============================================================================\n")
+        f.write(f"=============================================================================\n")
+        f.write(f"=============================================================================\n")
+
 """
 STEP 7: Simulation loop 
 """
@@ -484,9 +545,15 @@ def simulate_dynamic_allocation():
         print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
         for unit in db.database.values():
             unit.traffic_demand *= 1.2
+        
+        generate_report(year)
+
+if __name__ == "__main__":
+    open(report_file_path, "w").close()
+    simulate_dynamic_allocation()
+    
 
 
-simulate_dynamic_allocation()
 
 #---------------------------- Alternate Functions -----------------------------#
 '''

@@ -1,3 +1,13 @@
+meeting notes 4/7
+
+Q: For what ranges does the traffic demand actually make sense 
+- check if make_request logic is correct
+    - causing the requests to be very large (in GHz)
+- check values for traffic_demand_bounds inside calculate_traffic_demand
+
+=================================================
+=================================================
+=================================================
 
 meeting notes 3/31
 
@@ -7,17 +17,10 @@ meeting notes 3/31
     - # wifi HS where desired is achieved / # total hotspots
     - sum over all HS (data rate acheived) / sum over all HS (data rate desired)
     - ^same for cellular
-    
-
-
-
-
 
 =================================================
 =================================================
 =================================================
-
-
 
 meeting notes from 2/28
 - to prevent interference willn ot put cell and wifi device within distance d of each other
