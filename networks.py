@@ -113,23 +113,16 @@ class NetworkUnit:
     def make_request(self, db_request_queue):
         required_bw = self.traffic_demand * 2
         
-        if len(self.frequency_bands) == 0:
+        if self.bandwidth == 0:
             # make a request to DB using self.traffic_demand
             db_request_queue.put((self.id, required_bw))
         else:
-            total_traffic_capacity = 0
-            total_current_bw = 0
-            for band in self.frequency_bands: # (6.5, 6.6)
-                band_bw = (band[1] - band[0]) * 1000 # multiply by 1000 to convert Ghz to MHz
-                band_traffic_capacity = band_bw / 2
-                total_current_bw += band_bw
-                total_traffic_capacity += band_traffic_capacity
-            
+            total_traffic_capacity = self.bandwidth / 2
             if (self.traffic_demand - total_traffic_capacity) >= 10:
                 # make a request to DB using excess traffic
-                assert required_bw > total_current_bw, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= total_current_bw."
+                assert required_bw > self.bandwidth, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= self.bandwidth."
                 # print (f"Unit {self.id} made a request to DB for more spectrum: {required_bw - total_current_bw} MHz")
-                db_request_queue.put((self.id, required_bw - total_current_bw)) 
+                db_request_queue.put((self.id, required_bw - self.bandwidth)) 
 
 
 
