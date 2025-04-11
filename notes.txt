@@ -1,3 +1,35 @@
+meeting notes 4/11
+
+inputs:
+- population density (3 types of neighborhoods)
+- time of day (6 times of day)
+    - 3 levels of usage (low, medium, high)
+
+Q: report generation (how much traffic demand requires a new unit)
+- cellular: yes central planner
+    - if not happy w perforamnce, build another and strategically choose location
+    - not happy: amnt of traffic not being carried is significant enough 
+        - avg or peak hour thing
+        - avg for a region (block)
+        - avg for a type of neighborhood (pop density)
+        - avg across city not a useful metric
+    - unmet demand and congested device in diff times of day and diff types of neighborhood
+    - these times of day we are having these problems in these types of neighborhoods
+    - if bad perf in high desnity neighborhoods, increase densite ofbase Stations
+- wifi: no central planner
+    - no way to add wifi devices
+    - upgrade wifi device (not get more of them)
+        - what is the cost of these upgrades
+
+- unmet demand separate from congested nodes 
+    - wifi care more about congested nodes
+    - cellular care more about unmet demand
+
+
+==============================================
+==============================================
+==============================================
+
 meeting notes 4/7
 
 Q: For what ranges does the traffic demand actually make sense 

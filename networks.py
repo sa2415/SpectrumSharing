@@ -53,10 +53,10 @@ class NetworkUnit:
     def calculate_traffic_demand(self, snapshot):
         
         # pop density --> (lower, upper) traffic demand bound for the unit
-        #TODO: fix these numbers
+        #TODO: fix these numbers (make it respond to traffic demand increase)
         traffic_demand_bounds = {
-            0: (2, 5),
-            1: (20, 50),
+            0: (100, 200),
+            1: (100, 200),
             2: (100, 200)
         }
 
@@ -109,16 +109,16 @@ class NetworkUnit:
             make a request to the db for the additional spectrum needed
     
     Formula: 
-        required_bw = traffic_demand (MHz) * 2 bits/Hz = 2*traffic_demand Mbps
+        required_bw = traffic_demand (Mbps) / 2 (bits/Hz) = 2*traffic_demand MHz
     """
     def make_request(self, db_request_queue):
-        required_bw = self.traffic_demand * 2
+        required_bw = self.traffic_demand / 2
         
         if self.bandwidth == 0:
             # make a request to DB using self.traffic_demand
             db_request_queue.put((self.id, required_bw))
         else:
-            total_traffic_capacity = self.bandwidth / 2
+            total_traffic_capacity = self.bandwidth * 2
             if (self.traffic_demand - total_traffic_capacity) >= 10:
                 # make a request to DB using excess traffic
                 assert required_bw > self.bandwidth, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= self.bandwidth."
@@ -496,11 +496,11 @@ def get_snapshot_duration(snapshot):
     return 0
 
 def calc_unserviced_traffic_demand(unit):
-    desired_bw = unit.traffic_demand * 2
+    desired_bw = unit.traffic_demand / 2
     allocated_bw = unit.bandwidth
     # assert(desired_bw > allocated_bw)
     unserviced_bw = desired_bw - allocated_bw
-    unserviced_traffic_demand = unserviced_bw / 2
+    unserviced_traffic_demand = unserviced_bw * 2
     return max(0, unserviced_traffic_demand)
     
 def generate_report(year):
@@ -524,16 +524,16 @@ def generate_report(year):
                 if unit.congested:
                     num_congested_hs += 1
                     hs_congestion[unit.id] = calc_unserviced_traffic_demand(unit)
-                sum_desired_hs += unit.traffic_demand * 2
-                sum_allocated_hs += min(unit.traffic_demand * 2, unit.bandwidth)
+                sum_desired_hs += unit.traffic_demand / 2
+                sum_allocated_hs += min(unit.traffic_demand / 2, unit.bandwidth)
 
             elif unit.unit_type == UnitType.BS:
                 total_num_bs += 1
                 if unit.congested:
                     num_congested_bs += 1
                     bs_congestion[unit.id] = calc_unserviced_traffic_demand(unit)
-                sum_desired_bs += unit.traffic_demand * 2
-                sum_allocated_bs += min(unit.traffic_demand * 2, unit.bandwidth)
+                sum_desired_bs += unit.traffic_demand / 2
+                sum_allocated_bs += min(unit.traffic_demand / 2, unit.bandwidth)
         
         congested_bs = 100 * num_congested_bs / total_num_bs
         congested_hs = 100 * num_congested_hs / total_num_hs
@@ -610,6 +610,7 @@ def simulate_dynamic_allocation():
         print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
         for unit in db.database.values():
             unit.traffic_demand *= 1.2
+            #TODO need to update the usage bounds that are currently hardcoded
         
         generate_report(year)
 
