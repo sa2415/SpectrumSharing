@@ -525,7 +525,7 @@ def generate_report(year):
                     num_congested_hs += 1
                     hs_congestion[unit.id] = calc_unserviced_traffic_demand(unit)
                 sum_desired_hs += unit.traffic_demand * 2
-                sum_allocated_hs += unit.bandwidth
+                sum_allocated_hs += min(unit.traffic_demand * 2, unit.bandwidth)
 
             elif unit.unit_type == UnitType.BS:
                 total_num_bs += 1
@@ -533,7 +533,7 @@ def generate_report(year):
                     num_congested_bs += 1
                     bs_congestion[unit.id] = calc_unserviced_traffic_demand(unit)
                 sum_desired_bs += unit.traffic_demand * 2
-                sum_allocated_bs += unit.bandwidth
+                sum_allocated_bs += min(unit.traffic_demand * 2, unit.bandwidth)
         
         congested_bs = 100 * num_congested_bs / total_num_bs
         congested_hs = 100 * num_congested_hs / total_num_hs
