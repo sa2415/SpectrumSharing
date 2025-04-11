@@ -15,8 +15,8 @@ from scipy.spatial import KDTree
 
 report_file_path = "report.log"
 
-D_w = 10  # Distance threshold
-D_c = 25
+D_w = 3  # Distance threshold
+D_c = 5
 
 class UnitType(Enum):
     BS = 0
@@ -53,10 +53,11 @@ class NetworkUnit:
     def calculate_traffic_demand(self, snapshot):
         
         # pop density --> (lower, upper) traffic demand bound for the unit
+        #TODO: fix these numbers
         traffic_demand_bounds = {
-            0: (20, 50),
-            1: (200, 500),
-            2: (20, 50)
+            0: (2, 5),
+            1: (2, 5),
+            2: (2, 5)
         }
 
         # (snapshot, unit_type) --> traffic intensity level
@@ -234,7 +235,7 @@ STEP 2: Placing BS and HS
 """
 db = Database()
 unit_id = 0
-block_size = 50
+block_size = 10
 grid_size = 100
 
 for i in range(city_size[0]):
@@ -243,14 +244,14 @@ for i in range(city_size[0]):
         traffic_demand = 0
         # setting the number of hs and bs acc to density [TODO]
         if pop_density == 2:
-            hs_count = 10  #10
-            bs_count = 5 #5
+            hs_count = 5  #10
+            bs_count = 3 #5
         elif pop_density == 1:
-            hs_count = 0   #5
-            bs_count = 0   #2
+            hs_count = 4   #5
+            bs_count = 2   #2
         else:
-            hs_count = 0  #3
-            bs_count = 0  #1
+            hs_count = 3  #3
+            bs_count = 1  #1
 
         coordinates = set()
         for _ in range (hs_count):
@@ -403,8 +404,10 @@ def allocate_spectrum(unit, bandwidth):
                 # if unit requests x, assign it x/total_freq * total_bandwidth
             # unit.limit = round((db.wifi_freq_range[1]-db.wifi_freq_range[0])/(len(group_dict[unit.id])+1), 5)
 
-            groupID = db.database[unit].group_id
-            total_freq_allocated = group_freq_dict[groupID]
+            groupID = db.database[unit.id].group_id
+            total_freq_allocated = group_freq_dict.get(groupID, 0)
+            if total_freq_allocated == 0:
+                group_freq_dict[groupID] = 0
 
             if (bandwidth+total_freq_allocated) <= (db.wifi_freq_range[1]-db.wifi_freq_range[0]):
                 unit.bandwidth = bandwidth
@@ -421,7 +424,7 @@ def allocate_spectrum(unit, bandwidth):
 
         elif unit.unit_type == UnitType.BS:
             unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]) /(len(group_dict[unit.id])+1), 5)
-            groupID = db.database[unit].group_id
+            groupID = db.database[unit.id].group_id
             total_freq_allocated = group_freq_dict[groupID]
 
             if (bandwidth+total_freq_allocated) <= (db.cellular_freq_range[1]-db.cellular_freq_range[0]):
@@ -452,29 +455,16 @@ def print_database_state(db, group_dict):
     """
     Prints the current state of the database in a tabular format.
     """
-    header = f"\n\n\n{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand (Mbps)':<30}{'Bands Allocated (GHz)':<45}{'Congested':<10}{'Density':<10}{'Limit':<10}{'Group Members':<20}"
+    header = f"\n\n\n{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand (Mbps)':<30}{'Bandwidth Allocated (MHz)':<45}{'Congested':<10}{'Density':<10}{'Limit':<10}{'Group Members':<20}"
     print(header)
     print("-" * len(header))
 
     for unit in db.database.values():
-        bands_list = []
-        for band in unit.frequency_bands:
-            start, end = band[0], band[1]
-            bands_list.append(f"({start:.2f}-{end:.2f})")
-        
-        # Split bands over multiple lines if too many
-        max_bands_per_line = 4
-        band_lines = [' '.join(bands_list[i:i+max_bands_per_line]) for i in range(0, len(bands_list), max_bands_per_line)]
-        
         group_str = ', '.join(map(str, group_dict.get(unit.id, [])))
         
         # First line with full info
         print(f"{unit.id:<5}{unit.unit_type.name:<10}{str(unit.position):<15}{unit.traffic_demand:<15}"
-              f"{band_lines[0] if band_lines else '':<60}{str(unit.congested):<10}{unit.density:<10}{str(unit.limit):<10}{group_str:<20}")
-        
-        # Additional lines for overflow bands (only print bands)
-        for extra_line in band_lines[1:]:
-            print(f"{'':<45}{extra_line:<60}")
+              f"{unit.bandwidth:<60}{str(unit.congested):<10}{unit.density:<10}{str(unit.limit):<10}{group_str:<20}")
     
     print("\n")
 
@@ -499,9 +489,9 @@ def get_snapshot_duration(snapshot):
 
 def calc_unserviced_traffic_demand(unit):
     desired_bw = unit.traffic_demand * 2
-    allocated_bw = total_frequency_allocated(unit)
+    allocated_bw = unit.bandwidth
     assert(desired_bw > allocated_bw)
-    unserviced_bw = (desired_bw - allocated_bw) * 1000 # convert from Ghz to MHz
+    unserviced_bw = desired_bw - allocated_bw
     unserviced_traffic_demand = unserviced_bw / 2
     return unserviced_traffic_demand
     
@@ -517,24 +507,31 @@ def generate_report(year):
         hs_congestion = {}
         bs_congestion = {}
 
+        sum_desired_hs, sum_allocated_hs = 0, 0
+        sum_desired_bs, sum_allocated_bs = 0, 0
+
         for unit in db.database.values():
             if unit.unit_type == UnitType.HS:
                 total_num_hs += 1
                 if unit.congested:
                     num_congested_hs += 1
                     hs_congestion[unit.id] = calc_unserviced_traffic_demand(unit)
+                sum_desired_hs += unit.traffic_demand * 2
+                sum_allocated_hs += unit.bandwidth
 
             elif unit.unit_type == UnitType.BS:
                 total_num_bs += 1
                 if unit.congested:
                     num_congested_bs += 1
                     bs_congestion[unit.id] = calc_unserviced_traffic_demand(unit)
+                sum_desired_bs += unit.traffic_demand * 2
+                sum_allocated_bs += unit.bandwidth
         
         congested_bs = 100 * num_congested_bs / total_num_bs
         congested_hs = 100 * num_congested_hs / total_num_hs
 
-        f.write(f"Percentage of congested Hotspots: {congested_hs}%\n")
-        f.write(f"Percentage of congested Base Stations: {congested_bs}%\n")
+        f.write(f"Percentage of congested Hotspots: {congested_hs:.3f}%\n")
+        f.write(f"Percentage of congested Base Stations: {congested_bs:.3f}%\n")
 
         total_unserviced_traffic_demand_hs = 0
         for unit_id in hs_congestion:
@@ -544,17 +541,27 @@ def generate_report(year):
         for unit_id in bs_congestion:
             total_unserviced_traffic_demand_bs += bs_congestion[unit_id]
 
-        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Hotspots: {total_unserviced_traffic_demand_hs}")
-        f.write(f"\nAvg Unserviced Traffic Demand (Mbps) per Hotspot: {total_unserviced_traffic_demand_hs / total_num_hs}\n")
-        for unit_id in hs_congestion:
-            x, y = db.database[unit_id].position
-            f.write(f"Unit {unit_id} Pos {(x, y)}: {hs_congestion[unit_id]}\n")
+        avg_unserviced_traffic_demand_hs = total_unserviced_traffic_demand_hs / total_num_hs
+        avg_unserviced_traffic_demand_bs = total_unserviced_traffic_demand_bs / total_num_bs
+
+        percent_traffic_demand_met_hs = (sum_allocated_hs / sum_desired_hs)*100
+        percent_traffic_demand_met_bs = (sum_allocated_bs / sum_desired_bs)*100
+
+        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Hotspots: {total_unserviced_traffic_demand_hs:.3f}")
+        f.write(f"\nAvg Unserviced Traffic Demand (Mbps) per Hotspot: {avg_unserviced_traffic_demand_hs:.3f}")
+        f.write(f"\nPercentage of Total Wifi Traffic Demand Met: {percent_traffic_demand_met_hs:.3f}%\n")
+
+        # for unit_id in hs_congestion:
+        #     x, y = db.database[unit_id].position
+        #     f.write(f"Unit {unit_id} Pos {(x, y)}: {hs_congestion[unit_id]}\n")
         
-        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Base Stations: {total_unserviced_traffic_demand_bs}")
-        f.write(f"\nAvg Unserviced Traffic Demand (Mbps) per Base Station: {total_unserviced_traffic_demand_bs / total_num_bs}\n")
-        for unit_id in bs_congestion:
-            x, y = db.database[unit_id].position
-            f.write(f"Unit {unit_id} Pos {(x, y)}: {bs_congestion[unit_id]}\n")
+        f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Base Stations: {total_unserviced_traffic_demand_bs:.3f}")
+        f.write(f"\nAvg Unserviced Traffic Demand (Mbps) per Base Station: {avg_unserviced_traffic_demand_bs:.3f}\n")
+        f.write(f"\nPercentage of Total Cellular Traffic Demand Met: {percent_traffic_demand_met_bs:.3f}%\n")
+
+        # for unit_id in bs_congestion:
+        #     x, y = db.database[unit_id].position
+        #     f.write(f"Unit {unit_id} Pos {(x, y)}: {bs_congestion[unit_id]}\n")
 
         f.write(f"\n=============================================================================\n")
         f.write(f"=============================================================================\n")
@@ -588,8 +595,8 @@ def simulate_dynamic_allocation():
                     # request processed
                     # db.request_queue.get()
                 db.update_ratios(snapshot)
-                # print(f"    Updated spectrum allocation ratios for snapshot {snapshot + 1}.")
-                # print_database_state(db, group_dict)
+                print(f"    Updated spectrum allocation ratios for snapshot {snapshot + 1}.")
+                print_database_state(db, group_dict)
            
     
         print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
