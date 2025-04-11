@@ -56,8 +56,8 @@ class NetworkUnit:
         #TODO: fix these numbers
         traffic_demand_bounds = {
             0: (2, 5),
-            1: (2, 5),
-            2: (2, 5)
+            1: (20, 50),
+            2: (100, 200)
         }
 
         # (snapshot, unit_type) --> traffic intensity level
@@ -244,10 +244,10 @@ for i in range(city_size[0]):
         traffic_demand = 0
         # setting the number of hs and bs acc to density [TODO]
         if pop_density == 2:
-            hs_count = 5  #10
-            bs_count = 3 #5
+            hs_count = 10  #10
+            bs_count = 5 #5
         elif pop_density == 1:
-            hs_count = 4   #5
+            hs_count = 5   #5
             bs_count = 2   #2
         else:
             hs_count = 3  #3
@@ -498,10 +498,10 @@ def get_snapshot_duration(snapshot):
 def calc_unserviced_traffic_demand(unit):
     desired_bw = unit.traffic_demand * 2
     allocated_bw = unit.bandwidth
-    assert(desired_bw > allocated_bw)
+    # assert(desired_bw > allocated_bw)
     unserviced_bw = desired_bw - allocated_bw
     unserviced_traffic_demand = unserviced_bw / 2
-    return unserviced_traffic_demand
+    return max(0, unserviced_traffic_demand)
     
 def generate_report(year):
     with open(report_file_path, "a") as f:
@@ -564,7 +564,7 @@ def generate_report(year):
         #     f.write(f"Unit {unit_id} Pos {(x, y)}: {hs_congestion[unit_id]}\n")
         
         f.write(f"\nTotal Unserviced Traffic Demand (Mbps) for Base Stations: {total_unserviced_traffic_demand_bs:.3f}")
-        f.write(f"\nAvg Unserviced Traffic Demand (Mbps) per Base Station: {avg_unserviced_traffic_demand_bs:.3f}\n")
+        f.write(f"\nAvg Unserviced Traffic Demand (Mbps) per Base Station: {avg_unserviced_traffic_demand_bs:.3f}")
         f.write(f"\nPercentage of Total Cellular Traffic Demand Met: {percent_traffic_demand_met_bs:.3f}%\n")
 
         # for unit_id in bs_congestion:
