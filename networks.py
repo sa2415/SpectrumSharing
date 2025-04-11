@@ -404,67 +404,75 @@ def allocate_spectrum(unit, bandwidth):
                 # if unit requests x, assign it x/total_freq * total_bandwidth
             # unit.limit = round((db.wifi_freq_range[1]-db.wifi_freq_range[0])/(len(group_dict[unit.id])+1), 5)
 
-            groupID = db.database[unit.id].group_id
-            total_freq_allocated = group_freq_dict.get(groupID, 0)
-            if total_freq_allocated == 0:
-                group_freq_dict[groupID] = 0
+            groupID = unit.group_id
+            total_freq_allocated = group_freq_dict[groupID]
 
-            if (bandwidth+total_freq_allocated) <= (db.wifi_freq_range[1]-db.wifi_freq_range[0]):
+            if (bandwidth+total_freq_allocated) <= ((db.wifi_freq_range[1]-db.wifi_freq_range[0])*1000):
                 unit.bandwidth = bandwidth
                 group_freq_dict[groupID] += bandwidth
 
             else: 
-                unit.bandwidth = bandwidth / (total_freq_allocated + bandwidth) * (db.wifi_freq_range[1]-db.wifi_freq_range[0])
+                # if unit.id == 0:
+                #     print ("hi")
+                unit.bandwidth = bandwidth / (total_freq_allocated + bandwidth) * ((db.wifi_freq_range[1]-db.wifi_freq_range[0])*1000)
+                # if unit.id == 0:
+                    # print (f"Unit {unit.id} bandwidth: {unit.bandwidth}")
                 # reallocating the other unit's bandwidths
                 for member in group_members_dict[unit.group_id]:
+                    if member == unit.id:
+                        continue
                     member_unit = db.database[member]
-                    member_unit.bandwidth = member_unit.bandwidth / (total_freq_allocated + bandwidth) * (db.wifi_freq_range[1]-db.wifi_freq_range[0])
-                
+                    # if member_unit.id == 0 and unit.id == 0:
+                        # print (f"Member {member} bandwidth before: {member_unit.bandwidth}")
+                    # print (f"Member {member} bandwidth before: {member_unit.bandwidth}")
+                    member_unit.bandwidth = member_unit.bandwidth / (total_freq_allocated + bandwidth) * ((db.wifi_freq_range[1]-db.wifi_freq_range[0])*1000)
+                    # print (f"Member {member} bandwidth after: {member_unit.bandwidth}")
+                # print ("\n")
                 unit.congested = True
 
         elif unit.unit_type == UnitType.BS:
             unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]) /(len(group_dict[unit.id])+1), 5)
-            groupID = db.database[unit.id].group_id
+            groupID = unit.group_id
             total_freq_allocated = group_freq_dict[groupID]
 
-            if (bandwidth+total_freq_allocated) <= (db.cellular_freq_range[1]-db.cellular_freq_range[0]):
+            if (bandwidth+total_freq_allocated) <= ((db.cellular_freq_range[1]-db.cellular_freq_range[0])*1000):
                 unit.bandwidth = bandwidth
                 group_freq_dict[groupID] += bandwidth
 
             else: 
-                unit.bandwidth = bandwidth / (total_freq_allocated + bandwidth) * (db.cellular_freq_range[1]-db.cellular_freq_range[0])
+                unit.bandwidth = bandwidth / (total_freq_allocated + bandwidth) * ((db.cellular_freq_range[1]-db.cellular_freq_range[0])*1000)
                 # reallocating the other unit's bandwidths
                 for member in group_members_dict[unit.group_id]:
                     member_unit = db.database[member]
-                    member_unit.bandwidth = member_unit.bandwidth / (total_freq_allocated + bandwidth) * (db.cellular_freq_range[1]-db.cellular_freq_range[0])
-                
+                    member_unit.bandwidth = member_unit.bandwidth / (total_freq_allocated + bandwidth) * ((db.cellular_freq_range[1]-db.cellular_freq_range[0])*1000)
                 unit.congested = True
             
             
     else:
         if unit.unit_type == UnitType.HS:
-            unit.bandwidth = (db.wifi_freq_range[1]-db.wifi_freq_range[0])
+            unit.bandwidth = (db.wifi_freq_range[1]-db.wifi_freq_range[0])*1000
             # unit.frequency_bands.add(db.wifi_freq_range)
         else:
-            unit.bandwidth = (db.cellular_freq_range[1]-db.cellular_freq_range[0])
+            unit.bandwidth = (db.cellular_freq_range[1]-db.cellular_freq_range[0])*1000
             # unit.frequency_bands.add(db.cellular_freq_range)
         unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]), 3) if unit.unit_type == UnitType.BS else round((db.wifi_freq_range[1]-db.wifi_freq_range[0]), 3)
         unit.congested = False
+
 
 def print_database_state(db, group_dict):
     """
     Prints the current state of the database in a tabular format.
     """
-    header = f"\n\n\n{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand (Mbps)':<30}{'Bandwidth Allocated (MHz)':<45}{'Congested':<10}{'Density':<10}{'Limit':<10}{'Group Members':<20}"
+    header = f"\n\n\n{'ID':<5}{'Type':<10}{'Position':<15}{'Traffic Demand (Mbps)':<30}{'Bandwidth (MHz)':<20}{'Congested':<10}{'Density':<10}{'Group Members':<20}"
     print(header)
     print("-" * len(header))
 
     for unit in db.database.values():
+        
         group_str = ', '.join(map(str, group_dict.get(unit.id, [])))
         
-        # First line with full info
-        print(f"{unit.id:<5}{unit.unit_type.name:<10}{str(unit.position):<15}{unit.traffic_demand:<15}"
-              f"{unit.bandwidth:<60}{str(unit.congested):<10}{unit.density:<10}{str(unit.limit):<10}{group_str:<20}")
+        print(f"{unit.id:<5}{unit.unit_type.name:<10}{str(unit.position):<15}{unit.traffic_demand:<30}"
+              f"{unit.bandwidth:<20.2f}{str(unit.congested):<10}{unit.density:<10}{group_str:<20}")
     
     print("\n")
 
