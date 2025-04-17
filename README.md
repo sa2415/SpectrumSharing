@@ -14,14 +14,13 @@ The goal of this simulator is to evaluate the efficiency of a **centralized data
 - Population growth and its effects  
 - Efficiency metrics like spectral utilization and conflict resolution
 
----
+
 
 ## 🏗️ Project Structure
 - networks.py 
 - output.log 
 - config.py (TODO)
 
----
 
 ## 🚀 How It Works
 
@@ -73,7 +72,6 @@ The goal of this simulator is to evaluate the efficiency of a **centralized data
   - Total bandwidth served
 - Results are plotted over time for analysis.
 
----
 
 ## 📦 Requirements
 
@@ -83,7 +81,6 @@ Make sure to install required Python libraries:
 pip install numpy matplotlib
 ```
 
----
 ## 🧪 Running the Simulation
 
 To run the simulation, execute the following command in the root directory:
@@ -98,7 +95,7 @@ You can edit simulation parameters inside config.py to customize:
 	•	Traffic bounds per population density
 	•	Growth rate and time-step frequency
 
----
+
 ## 🛠️ Configuration Options
 
 You can adjust the simulation by editing config.py. Key options include:
@@ -115,7 +112,7 @@ You can adjust the simulation by editing config.py. Key options include:
 | `GROWTH_RATE`       | Annual city-wide population growth (%)              | 20                |
 | `N_HS_PER_DENSITY`  | Initial HS count per density level                  | {0: 2, 1: 4, ...} |
 | `N_BS_PER_DENSITY`  | Initial BS count per density level                  | {0: 1, 1: 2, ...} |
----
+
 
 ## 📈 Output
 
@@ -134,7 +131,7 @@ After running the simulation, the following plots and statistics are generated (
 - 💡 **Total Bandwidth Served**  
   Measures overall spectrum allocation success over time.
 
----  
+
 
 ## 🧑‍💻 Authors
 
