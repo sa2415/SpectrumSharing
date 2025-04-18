@@ -852,6 +852,7 @@ if __name__ == "__main__":
     plot_yearly_congestion(yearly_congestion_hs, "HS")
     plot_congestion_heatmap(yearly_congestion_bs, "BS")
     plot_congestion_heatmap(yearly_congestion_hs, "HS")
+    
     # animate_congestion(db_snapshots, UnitType.HS, "hs_congestion", city_size=(100, 100), population_density=population_density)
     # animate_congestion(db_snapshots, UnitType.BS, "bs_congestion", city_size=(100, 100), population_density=population_density)
     # animate_congestion(db_snapshots, population_density, UnitType.HS, "hs_congestion", city_size)
