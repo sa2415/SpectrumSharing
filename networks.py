@@ -1,5 +1,6 @@
 import os
 import math
+import copy
 import queue
 import random
 import numpy as np
@@ -9,6 +10,11 @@ from scipy.spatial import KDTree
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from scipy.spatial.distance import cdist
+from matplotlib.colors import ListedColormap
+
+import seaborn as sns
+import numpy as np
+import matplotlib.animation as animation
 
 import config
 
@@ -28,7 +34,7 @@ D_w = config.D_w
 D_c = config.D_c
 traffic_demand_bounds = config.traffic_demand_bounds
 
-
+db_snapshots = []
 yearly_stats = defaultdict(list)
 yearly_congestion_hs = {0: [], 1: [], 2: []}
 yearly_congestion_bs = {0: [], 1: [], 2: []}
@@ -157,38 +163,39 @@ def calculate_distance(unit1, unit2):
     x2, y2 = unit2.position
     return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-# Plotting function
-def plot_units():
-    # Create lists for x and y positions of BS units
-    bs_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.BS]
-    x_positions = [unit.position[0] for unit in bs_units]
-    y_positions = [unit.position[1] for unit in bs_units]
+# Make sure output directory exists
+os.makedirs("outputs", exist_ok=True)
 
-    # Create a plot
+def plot_units(unit_type_to_plot, filename, db, D_threshold):
+    units = [unit for unit in db.database.values() if unit.unit_type == unit_type_to_plot]
+    x_positions = [unit.position[0] for unit in units]
+    y_positions = [unit.position[1] for unit in units]
+
     plt.figure(figsize=(10, 10))
-    
-    # Plot all BS units in blue
-    plt.scatter(x_positions, y_positions, color='blue', label="BS Unit")
-    
-    # Check distance between units and color code them
-    for i, unit1 in enumerate(bs_units):
-        for j, unit2 in enumerate(bs_units):
-            if i < j:  # Avoid double counting
+    plt.scatter(x_positions, y_positions, color='blue', label=f"{unit_type_to_plot.name} Unit")
+
+    for i, unit1 in enumerate(units):
+        for j, unit2 in enumerate(units):
+            if i < j:
                 distance = calculate_distance(unit1, unit2)
-                if distance <= D_c:
-                    # If units are within D_w distance, color them in red
-                    plt.scatter([unit1.position[0], unit2.position[0]], 
-                                [unit1.position[1], unit2.position[1]], 
-                                color='red', label="Units within D_w" if i == 0 else "")
-    
-    # Label and show plot
-    plt.title(f"BS Units and Units within {D_c} Units Distance")
+                if distance <= D_threshold:
+                    plt.plot(
+                        [unit1.position[0], unit2.position[0]],
+                        [unit1.position[1], unit2.position[1]],
+                        color='red',
+                        alpha=0.6,
+                        label="Units within threshold" if i == 0 and j == 1 else ""
+                    )
+
+    plt.title(f"{unit_type_to_plot.name} Units within {D_threshold} Distance")
     plt.xlabel("X Position")
     plt.ylabel("Y Position")
     plt.legend(loc="upper right")
     plt.grid(True)
-    plt.show()
 
+    # Save the figure
+    plt.savefig(f"outputs/{filename}.png")
+    plt.close()
 #-----------------------------------------------------------------------------------#
 
 """
@@ -297,7 +304,6 @@ for i in range(city_size[0]):
             db.database[unit_id] = NetworkUnit(unit_id, (x_pos, y_pos), traffic_demand, UnitType.BS, pop_density) 
             unit_id += 1
 
-# plot_units()
 
 for u in db.database.values():
     if u.unit_type == UnitType.HS:
@@ -578,18 +584,55 @@ def generate_report(year, total_num_hs, total_num_bs):
 
         if year == 0:
             # --- Intra-Day Congestion and Allocation Plots for Day 1 --- #
-            for metric in ["hs_congestion", "bs_congestion", "hs_bandwidth", "bs_bandwidth"]:
-                plt.figure(figsize=(8, 5))
-                values_for_day1 = [daily_snapshot_stats[metric][snapshot][0] for snapshot in range(6)]
-                plt.plot(range(1, 7), values_for_day1, marker="o")
-                plt.xlabel("Snapshot")
-                ylabel = "% Congestion" if "congestion" in metric else "Total Spectrum Allocated (MHz)"
-                plt.ylabel(ylabel)
-                title = f"{'Wi-Fi' if 'hs' in metric else 'Cellular'} {'Congestion' if 'congestion' in metric else 'Spectrum'} - Day 1"
-                plt.title(title)
-                plt.grid(True)
-                plt.savefig(f"outputs/{NUM_YEARS}_{metric}_snapshot_day1_plot.png")
-                plt.close()
+            # for metric in ["hs_congestion", "bs_congestion", "hs_bandwidth", "bs_bandwidth"]:
+            #     plt.figure(figsize=(8, 5))
+            #     values_for_day1 = [daily_snapshot_stats[metric][snapshot][0] for snapshot in range(6)]
+            #     plt.plot(range(1, 7), values_for_day1, marker="o")
+            #     plt.xlabel("Snapshot")
+            #     ylabel = "% Congestion" if "congestion" in metric else "Total Spectrum Allocated (MHz)"
+            #     plt.ylabel(ylabel)
+            #     title = f"{'Wi-Fi' if 'hs' in metric else 'Cellular'} {'Congestion' if 'congestion' in metric else 'Spectrum'} - Day 1"
+            #     plt.title(title)
+            #     plt.grid(True)
+            #     plt.savefig(f"outputs/{NUM_YEARS}_{metric}_snapshot_day1_plot.png")
+            #     plt.close()
+            snapshots = range(6)
+            # === Plot 1: Congestion (Grouped bar chart) ===
+            hs_congestion = [daily_snapshot_stats["hs_congestion"][snap][0] for snap in snapshots]
+            bs_congestion = [daily_snapshot_stats["bs_congestion"][snap][0] for snap in snapshots]
+
+            bar_width = 0.35
+            x = np.arange(len(snapshots))
+
+            plt.figure(figsize=(10, 5))
+            plt.bar(x - bar_width/2, hs_congestion, width=bar_width, label='Wi-Fi (HS)', color='skyblue')
+            plt.bar(x + bar_width/2, bs_congestion, width=bar_width, label='Cellular (BS)', color='salmon')
+            plt.xlabel("Snapshot")
+            plt.ylabel("% Congestion")
+            plt.title("Congestion Comparison (Wi-Fi vs Cellular) - Day 1")
+            plt.xticks(x, [f"{i+1}" for i in snapshots])
+            plt.legend()
+            plt.grid(True, axis='y')
+            plt.tight_layout()
+            # plt.savefig(f"outputs/{NUM_YEARS}_congestion_comparison_day1_bar.png")
+            plt.close()
+
+            # === Plot 2: Spectrum Allocation (Stacked bar chart) ===
+            hs_bandwidth = [daily_snapshot_stats["hs_bandwidth"][snap][0] for snap in snapshots]
+            bs_bandwidth = [daily_snapshot_stats["bs_bandwidth"][snap][0] for snap in snapshots]
+
+            plt.figure(figsize=(10, 5))
+            plt.bar(x, hs_bandwidth, label='Wi-Fi (HS)', color='skyblue')
+            plt.bar(x, bs_bandwidth, bottom=hs_bandwidth, label='Cellular (BS)', color='salmon')
+            plt.xlabel("Snapshot")
+            plt.ylabel("Total Spectrum Allocated (MHz)")
+            plt.title("Spectrum Allocation (Wi-Fi + Cellular) - Day 1")
+            plt.xticks(x, [f"{i+1}" for i in snapshots])
+            plt.legend()
+            plt.grid(True, axis='y')
+            plt.tight_layout()
+            plt.savefig(f"outputs/{NUM_YEARS}_bandwidth_comparison_day1_bar.png")
+            plt.close()
 
         if year == NUM_YEARS - 1:
             os.makedirs("outputs", exist_ok=True)
@@ -657,6 +700,81 @@ def plot_yearly_congestion(congestion_dict, label_prefix):
     plt.savefig(f"outputs/{NUM_YEARS}_{label_prefix.lower()}_density_congestion.png")
     plt.close()
 
+def plot_congestion_heatmap(congestion_dict, label_prefix):
+    # Prepare data as 2D array: rows = density, cols = years
+    data = []
+    for d in [0, 1, 2]:
+        data.append(congestion_dict.get(d, []))
+
+    data = np.array(data)
+    plt.figure(figsize=(10, 4))
+    sns.heatmap(data, annot=True, fmt=".1f", cmap="YlOrRd", cbar_kws={'label': '% Congestion'},
+                xticklabels=[f"Year {i+1}" for i in range(data.shape[1])],
+                yticklabels=[f"Density {i}" for i in range(data.shape[0])])
+    
+    plt.title(f"{label_prefix} Congestion Heatmap")
+    plt.xlabel("Year")
+    plt.ylabel("Geographic Density")
+    plt.tight_layout()
+    plt.savefig(f"outputs/{NUM_YEARS}_{label_prefix.lower()}_congestion_heatmap.png")
+    plt.close()
+
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import numpy as np
+import os
+
+# Function to animate congestion and show unit movement over time
+def animate_congestion(db_snapshots, unit_type_to_plot, filename, city_size, population_density):
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    # Background population density
+    cmap = ListedColormap(["#e0e0e0", "#a0a0a0", "#505050"])  # 0 = light, 1 = medium, 2 = dark
+    ax.imshow(population_density, cmap=cmap, extent=(0, city_size[0], 0, city_size[1]), origin="lower")
+
+    ax.set_xlim(0, city_size[0])
+    ax.set_ylim(0, city_size[1])
+    ax.set_title(f"{unit_type_to_plot.name} Congestion Over Time")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+
+    # Get all unit positions of the relevant type from the first snapshot
+    first_snapshot = db_snapshots[0]
+    all_units_of_type = {
+        unit.id: unit.position
+        for unit in first_snapshot.values()
+        if unit.unit_type == unit_type_to_plot
+    }
+
+    unit_ids = list(all_units_of_type.keys())
+    all_x = [pos[0] for pos in all_units_of_type.values()]
+    all_y = [pos[1] for pos in all_units_of_type.values()]
+
+    # Static scatter for all units in black
+    ax.scatter(all_x, all_y, s=10, c='black', label='Unit')
+
+    # Animated scatter for congested units in red
+    scatter_congested = ax.scatter([], [], s=10, c='red', label='Congested')
+    ax.legend()
+
+    def update(frame):
+        units = db_snapshots[frame]
+        x_cong, y_cong = [], []
+
+        for uid in unit_ids:
+            unit = units.get(uid)
+            if unit and unit.congested:
+                x, y = unit.position
+                x_cong.append(x)
+                y_cong.append(y)
+
+        scatter_congested.set_offsets(np.column_stack((x_cong, y_cong)))
+        ax.set_title(f"{unit_type_to_plot.name} Congestion - Year {frame + 1}")
+
+    ani = animation.FuncAnimation(fig, update, frames=len(db_snapshots), repeat=False)
+    ani.save(f"outputs/{filename}.gif", writer="pillow", fps=1)
+    plt.close()
+
 """
 STEP 7: Simulation loop 
 """
@@ -707,7 +825,8 @@ def simulate_dynamic_allocation(demand_growth_rate):
                 daily_snapshot_stats["bs_congestion"][snapshot].append(bs_congested / total_num_bs * 100)
                 daily_snapshot_stats["hs_bandwidth"][snapshot].append(db.cellular_freq_range[1] - db.cellular_freq_range[0])
                 daily_snapshot_stats["bs_bandwidth"][snapshot].append(db.wifi_freq_range[1] - db.wifi_freq_range[0])
-
+            
+        db_snapshots.append(copy.deepcopy(db.database))
 
 
         for d in [0, 1, 2]:
@@ -727,73 +846,16 @@ def simulate_dynamic_allocation(demand_growth_rate):
 if __name__ == "__main__":
     open(report_file_path, "w").close()
     simulate_dynamic_allocation(demand_growth_rate)
+    plot_units(UnitType.BS, "bs_units_distance", db, D_c)
+    plot_units(UnitType.HS, "hs_units_distance", db, D_w)
     plot_yearly_congestion(yearly_congestion_bs, "BS")
     plot_yearly_congestion(yearly_congestion_hs, "HS")
+    plot_congestion_heatmap(yearly_congestion_bs, "BS")
+    plot_congestion_heatmap(yearly_congestion_hs, "HS")
+    animate_congestion(db_snapshots, UnitType.HS, "hs_congestion", city_size=(100, 100), population_density=population_density)
+    animate_congestion(db_snapshots, UnitType.BS, "bs_congestion", city_size=(100, 100), population_density=population_density)
+    # animate_congestion(db_snapshots, population_density, UnitType.HS, "hs_congestion", city_size)
+    # animate_congestion(db_snapshots, population_density, UnitType.BS, "bs_congestion", city_size)
+    # animate_congestion(db_snapshots, UnitType.HS, "hs_congestion", city_size)
+    # animate_congestion(db_snapshots, UnitType.BS, "bs_congestion", city_size)
     
-
-
-
-#---------------------------- Alternate Functions -----------------------------#
-'''
-# Alternate function to assign groups using BFS
-
-# visited = set()
-
-# def assign_group():
-#     for unit_id1, unit1 in db.database.items():
-#         if unit1.unit_type == UnitType.BS:     
-#             group_dict[unit_id1] = []
-#             for unit_id2, unit2 in db.database.items():
-#                 if (unit2.unit_type == UnitType.BS) and (unit_id1 == unit_id2):
-#                     continue  
-#                 distance = calculate_distance(unit1, unit2)
-#                 if distance <= D_w:
-#                     group_dict[unit_id1].append(unit_id2)
-#         elif unit1.unit_type == UnitType.HS:     
-#             group_dict[unit_id1] = []
-#             for unit_id2, unit2 in db.database.items():
-#                 if (unit2.unit_type == UnitType.HS) and (unit_id1 == unit_id2):
-#                     continue  
-#                 distance = calculate_distance(unit1, unit2)
-#                 if distance <= D_c:
-#                     group_dict[unit_id1].append(unit_id2)
-
-def assign_group(unit_id, x, y):
-    """Assigns a group ID to all units within D_w of the given unit."""
-    global group_id_counter
-    group_id_counter = 0
-    queue = deque([(unit_id, x, y)])
-    visited.add(unit_id)
-    group_dict[unit_id] = group_id_counter
-    db.database[unit_id].group_id = group_id_counter  # Update unit itself
-
-    while queue:
-        uid, ux, uy = queue.popleft()
-        cell_x, cell_y = get_grid_cell(ux, uy, D_w)
-
-        # Check this cell and 8 neighboring cells
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                neighbor_cell = (cell_x + dx, cell_y + dy)
-
-                for neighbor_id in grid.get(neighbor_cell, []):
-                    if neighbor_id not in visited:
-                        nx, ny = db.database[neighbor_id].position
-                        distance = math.sqrt((nx - ux) ** 2 + (ny - uy) ** 2)
-
-                        if db.database[unit_id].unit_type == UnitType.HS:
-                            if distance <= D_w:  # Within threshold
-                                visited.add(neighbor_id)
-                                group_dict[neighbor_id] = group_id_counter
-                                db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
-                                queue.append((neighbor_id, nx, ny))
-                        elif db.database[unit_id].unit_type == UnitType.BS:
-                            if distance <= D_c:  # Within threshold
-                                visited.add(neighbor_id)
-                                group_dict[neighbor_id] = group_id_counter
-                                db.database[neighbor_id].group_id = group_id_counter  # Update unit itself
-                                queue.append((neighbor_id, nx, ny))
-
-    group_id_counter += 1  # Move to next group
-'''
-
