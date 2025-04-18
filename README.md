@@ -137,6 +137,7 @@ After running the simulation, the following plots and statistics are generated (
 
 Built by students at **Carnegie Mellon University** as part of a dynamic spectrum access research project.  
 For academic inquiries or contributions, please contact the project maintainers.
+
 Swati Anshu - sanshu@andrew.cmu.edu
 Nicole Feng - nvfeng@andrew.cmu.edu
 

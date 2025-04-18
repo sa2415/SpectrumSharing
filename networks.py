@@ -1,22 +1,25 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from collections import deque
-from scipy.spatial.distance import cdist
-import random
-from enum import Enum
-import queue
-from collections import defaultdict
+import os
 import math
+import queue
+import random
+import numpy as np
+from enum import Enum
+from collections import deque
 from scipy.spatial import KDTree
+import matplotlib.pyplot as plt
+from collections import defaultdict
+from scipy.spatial.distance import cdist
 
 
 # Origin is top-left
 # D_w, D_c = 10, 25
 
+demand_growth_rate = 1.0
 report_file_path = "report.log"
 
 D_w = 3  # Distance threshold
 D_c = 5
+
 
 class UnitType(Enum):
     BS = 0
@@ -50,14 +53,14 @@ class NetworkUnit:
     17:00 - 19:00 : high cell usage (wifi:cell = 40:60)
     19:00 - 24:00 : high wifi usage (wifi:cell = 75:25)
     """
-    def calculate_traffic_demand(self, snapshot):
+    def calculate_traffic_demand(self, snapshot, demand_growth_rate):
         
         # pop density --> (lower, upper) traffic demand bound for the unit
         #TODO: fix these numbers (make it respond to traffic demand increase)
         traffic_demand_bounds = {
             0: (100, 200),
-            1: (100, 200),
-            2: (100, 200)
+            1: (201, 300),
+            2: (301, 400)
         }
 
         # (snapshot, unit_type) --> traffic intensity level
@@ -77,6 +80,8 @@ class NetworkUnit:
         }
 
         lower_bound, upper_bound = traffic_demand_bounds[int(self.density)]
+        lower_bound = int(lower_bound * demand_growth_rate)
+        upper_bound = int(upper_bound * demand_growth_rate)
         traffic_intensity = traffic_intensity[(snapshot, self.unit_type)]
 
         range_size = upper_bound - lower_bound
@@ -93,8 +98,8 @@ class NetworkUnit:
 
         return random.randint(lower_bound, upper_bound) #uniform distribution
 
-    def update_traffic_demand(self, snapshot):
-        self.traffic_demand = self.calculate_traffic_demand(snapshot)
+    def update_traffic_demand(self, snapshot, demand_growth_rate):
+        self.traffic_demand = self.calculate_traffic_demand(snapshot, demand_growth_rate)
 
 
     """
@@ -378,10 +383,10 @@ def find_groups_and_sum_frequencies():
 assign_group()
 find_groups_and_sum_frequencies()
 
-print("Group Dictionary:", len(group_dict))
-print("Group Frequency Dictionary:", len(group_freq_dict))
-for gid, members in group_members_dict.items():
-    print(f"Group {gid} has {len(members)} units")
+# print("Group Dictionary:", len(group_dict))
+# print("Group Frequency Dictionary:", len(group_freq_dict))
+# for gid, members in group_members_dict.items():
+#     print(f"Group {gid} has {len(members)} units")
 
 
 
@@ -402,6 +407,7 @@ def allocate_spectrum(unit, bandwidth):
                 # if yes, allocate the bandwidth
             # if no, then use ratios 
                 # if unit requests x, assign it x/total_freq * total_bandwidth
+
             # unit.limit = round((db.wifi_freq_range[1]-db.wifi_freq_range[0])/(len(group_dict[unit.id])+1), 5)
 
             groupID = unit.group_id
@@ -412,22 +418,12 @@ def allocate_spectrum(unit, bandwidth):
                 group_freq_dict[groupID] += bandwidth
 
             else: 
-                # if unit.id == 0:
-                #     print ("hi")
-                unit.bandwidth = bandwidth / (total_freq_allocated + bandwidth) * ((db.wifi_freq_range[1]-db.wifi_freq_range[0])*1000)
-                # if unit.id == 0:
-                    # print (f"Unit {unit.id} bandwidth: {unit.bandwidth}")
-                # reallocating the other unit's bandwidths
+                unit.bandwidth = bandwidth / (total_freq_allocated + bandwidth) * ((db.wifi_freq_range[1]-db.wifi_freq_range[0])*1000)  
                 for member in group_members_dict[unit.group_id]:
                     if member == unit.id:
                         continue
                     member_unit = db.database[member]
-                    # if member_unit.id == 0 and unit.id == 0:
-                        # print (f"Member {member} bandwidth before: {member_unit.bandwidth}")
-                    # print (f"Member {member} bandwidth before: {member_unit.bandwidth}")
                     member_unit.bandwidth = member_unit.bandwidth / (total_freq_allocated + bandwidth) * ((db.wifi_freq_range[1]-db.wifi_freq_range[0])*1000)
-                    # print (f"Member {member} bandwidth after: {member_unit.bandwidth}")
-                # print ("\n")
                 unit.congested = True
 
         elif unit.unit_type == UnitType.BS:
@@ -503,6 +499,15 @@ def calc_unserviced_traffic_demand(unit):
     unserviced_traffic_demand = unserviced_bw * 2
     return max(0, unserviced_traffic_demand)
     
+
+# Store yearly stats
+yearly_stats = {
+    "congested_hs_percent": [],
+    "congested_bs_percent": [],
+    "percent_traffic_demand_met_hs": [],
+    "percent_traffic_demand_met_bs": []
+}
+
 def generate_report(year):
     with open(report_file_path, "a") as f:
         f.write(f"\n\n\n=============================================================================\n")
@@ -575,48 +580,96 @@ def generate_report(year):
         f.write(f"=============================================================================\n")
         f.write(f"=============================================================================\n")
 
+        yearly_stats["congested_hs_percent"].append(congested_hs)
+        yearly_stats["congested_bs_percent"].append(congested_bs)
+        yearly_stats["percent_traffic_demand_met_hs"].append(percent_traffic_demand_met_hs)
+        yearly_stats["percent_traffic_demand_met_bs"].append(percent_traffic_demand_met_bs)
+
+        if year == 2:
+            os.makedirs("outputs", exist_ok=True)
+            years = list(range(1, 4))
+
+            if year == 2:
+                os.makedirs("outputs", exist_ok=True)
+                years = list(range(1, 4))
+
+                # Plot 1: Hotspot Congestion Over Time
+                plt.figure(figsize=(8, 5))
+                plt.plot(years, yearly_stats["congested_hs_percent"], color="royalblue", marker="o")
+                plt.xlabel("Year")
+                plt.ylabel("HS Congestion (%)")
+                plt.title("Hotspot Congestion Over Time")
+                plt.grid(True)
+                plt.savefig("outputs/hs_congestion_plot.png")
+                plt.close()
+
+                # Plot 2: Base Station Congestion Over Time
+                plt.figure(figsize=(8, 5))
+                plt.plot(years, yearly_stats["congested_bs_percent"], color="firebrick", marker="o")
+                plt.xlabel("Year")
+                plt.ylabel("BS Congestion (%)")
+                plt.title("Base Station Congestion Over Time")
+                plt.grid(True)
+                plt.savefig("outputs/bs_congestion_plot.png")
+                plt.close()
+
+                # Plot 3: Wi-Fi Traffic Demand Met
+                plt.figure(figsize=(8, 5))
+                plt.plot(years, yearly_stats["percent_traffic_demand_met_hs"], color="seagreen", marker="o")
+                plt.xlabel("Year")
+                plt.ylabel("Wi-Fi Traffic Demand Met (%)")
+                plt.title("Wi-Fi Traffic Demand Satisfaction Over Time")
+                plt.grid(True)
+                plt.savefig("outputs/wifi_demand_met_plot.png")
+                plt.close()
+
+                # Plot 4: Cellular Traffic Demand Met
+                plt.figure(figsize=(8, 5))
+                plt.plot(years, yearly_stats["percent_traffic_demand_met_bs"], color="goldenrod", marker="o")
+                plt.xlabel("Year")
+                plt.ylabel("Cellular Traffic Demand Met (%)")
+                plt.title("Cellular Traffic Demand Satisfaction Over Time")
+                plt.grid(True)
+                plt.savefig("outputs/cellular_demand_met_plot.png")
+                plt.close()
+
+
 """
 STEP 7: Simulation loop 
 """
-def simulate_dynamic_allocation():
+def simulate_dynamic_allocation(demand_growth_rate):
     for year in range(3):
         print(f"\nStarting Year {year + 1}...\n")
-        for day in range(3):
+        for day in range(5):
             print(f"\n  Starting Day {day + 1}...\n")
-            for snapshot in range(2):
+            for snapshot in range(6):
                 print(f"    Snapshot {snapshot + 1}:")
-                # print(f"db.wifi_freq_range: {db.wifi_freq_range}")
-                # print(f"db.cellular_freq_range: {db.cellular_freq_range}")
                 for unit in db.database.values():
-                    unit.update_traffic_demand(snapshot)            
+                    unit.update_traffic_demand(snapshot, demand_growth_rate)            
                     unit.make_request(db.request_queue)
-                    # print(f"      Unit {unit.id}: Traffic Demand updated from {prev_demand} to {unit.traffic_demand}")
-                # for hour in range(get_snapshot_duration(snapshot)):
+
                 while not db.request_queue.empty():  
                     request = db.request_queue.get()  
                     unit_id, bandwidth = request 
                     unit = db.database[unit_id]
-                    # print(f"Request Queue: {list(db.request_queue.queue)}")
-                    # print(f"Processing request for Unit {unit_id} requesting {bandwidth} Mbps spectrum.")
-                    # print (db.wifi_freq_range, db.cellular_freq_range)
+
                     allocate_spectrum(unit, bandwidth)
-                    # request processed
-                    # db.request_queue.get()
+
                 db.update_ratios(snapshot)
-                print(f"    Updated spectrum allocation ratios for snapshot {snapshot + 1}.")
-                print_database_state(db, group_dict)
-           
-    
+                # print(f"    Updated spectrum allocation ratios for snapshot {snapshot + 1}.")
+        
         print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
-        for unit in db.database.values():
-            unit.traffic_demand *= 1.2
+        print_database_state(db, group_dict)
+        demand_growth_rate *= 1.5
+        # for unit in db.database.values():
+        #     unit.traffic_demand *= 1.2
             #TODO need to update the usage bounds that are currently hardcoded
         
         generate_report(year)
 
 if __name__ == "__main__":
     open(report_file_path, "w").close()
-    simulate_dynamic_allocation()
+    simulate_dynamic_allocation(demand_growth_rate)
     
 
 

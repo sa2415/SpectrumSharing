@@ -4,16 +4,16 @@
 =============================================================================
 ================================== Year 0 ==================================
 =============================================================================
-Percentage of congested Hotspots: 97.766%
-Percentage of congested Base Stations: 15.625%
+Percentage of congested Hotspots: 99.141%
+Percentage of congested Base Stations: 55.859%
 
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 97829.277
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 168.092
-Percentage of Total Wifi Traffic Demand Met: 6.118%
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 182418.802
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 313.434
+Percentage of Total Wifi Traffic Demand Met: 1.099%
 
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 2673.572
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 10.444
-Percentage of Total Cellular Traffic Demand Met: 78.495%
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 27350.860
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 106.839
+Percentage of Total Cellular Traffic Demand Met: 59.268%
 
 =============================================================================
 =============================================================================
@@ -24,16 +24,16 @@ Percentage of Total Cellular Traffic Demand Met: 78.495%
 =============================================================================
 ================================== Year 1 ==================================
 =============================================================================
-Percentage of congested Hotspots: 97.938%
-Percentage of congested Base Stations: 39.453%
+Percentage of congested Hotspots: 99.141%
+Percentage of congested Base Stations: 55.859%
 
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 98781.100
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 169.727
-Percentage of Total Wifi Traffic Demand Met: 5.498%
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 273895.476
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 470.611
+Percentage of Total Wifi Traffic Demand Met: 1.144%
 
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 5972.433
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 23.330
-Percentage of Total Cellular Traffic Demand Met: 79.417%
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 45956.654
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 179.518
+Percentage of Total Cellular Traffic Demand Met: 54.392%
 
 =============================================================================
 =============================================================================
@@ -44,16 +44,16 @@ Percentage of Total Cellular Traffic Demand Met: 79.417%
 =============================================================================
 ================================== Year 2 ==================================
 =============================================================================
-Percentage of congested Hotspots: 97.938%
-Percentage of congested Base Stations: 45.312%
+Percentage of congested Hotspots: 99.141%
+Percentage of congested Base Stations: 55.859%
 
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 98890.695
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 169.915
-Percentage of Total Wifi Traffic Demand Met: 5.477%
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 409770.264
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 704.073
+Percentage of Total Wifi Traffic Demand Met: 1.150%
 
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 7144.235
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 27.907
-Percentage of Total Cellular Traffic Demand Met: 78.239%
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 75734.753
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 295.839
+Percentage of Total Cellular Traffic Demand Met: 49.956%
 
 =============================================================================
 =============================================================================
