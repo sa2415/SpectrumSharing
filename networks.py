@@ -12,6 +12,8 @@ from collections import defaultdict
 from scipy.spatial.distance import cdist
 from matplotlib.colors import ListedColormap
 
+from collections import Counter
+
 import seaborn as sns
 import numpy as np
 import matplotlib.animation as animation
@@ -77,7 +79,6 @@ class NetworkUnit:
     def calculate_traffic_demand(self, snapshot, demand_growth_rate, traffic_demand_bounds):
         
         # pop density --> (lower, upper) traffic demand bound for the unit
-        #TODO: fix these numbers (make it respond to traffic demand increase)
 
         # (snapshot, unit_type) --> traffic intensity level
         traffic_intensity = {
@@ -143,14 +144,12 @@ class NetworkUnit:
             if (self.traffic_demand - total_traffic_capacity) >= 10:
                 # make a request to DB using excess traffic
                 assert required_bw > self.bandwidth, f"[NetworkUnit {self.id}][make_request]: Unit made a request to DB for more spectrum but required_bw <= self.bandwidth."
-                # print (f"Unit {self.id} made a request to DB for more spectrum: {required_bw - total_current_bw} MHz")
                 db_request_queue.put((self.id, required_bw - self.bandwidth)) 
 
 
 
 def total_frequency_allocated(unit):
     total = 0.0
-    # print (f"Unit {unit.id} frequency bands: {unit.frequency_bands}")
     for band in unit.frequency_bands:
         total += band[1] - band[0]
     return total
@@ -218,8 +217,6 @@ class Database:
         self.wifi_freq_range = (U6_START, ((U6_END-U6_START)*0.50 + U6_START))
         self.cellular_freq_range = (((U6_END-U6_START)*0.50 + U6_START), U6_END)
         self.request_queue = queue.Queue() 
-        # self.wifi_ptr = self.wifi_freq_range[0] # if < D_w
-        # self.cellular_ptr = self.cellular_freq_range[0] # if < D_w
 
     def update_ratios(self, snapshot):
         """
@@ -230,24 +227,36 @@ class Database:
         17:00 - 19:00 : high cell usage (wifi:cell = 40:60)
         19:00 - 24:00 : high wifi usage (wifi:cell = 75:25)
         """
-        if (snapshot == 0):
-            wifi_ratio = 50
-        elif (snapshot == 1):
-            wifi_ratio = 70
-        elif (snapshot == 2):
-            wifi_ratio = 30
-        elif (snapshot == 3):
-            wifi_ratio = 80
-        elif (snapshot == 4):
-            wifi_ratio = 40
-        elif (snapshot == 5):
-            wifi_ratio = 75
-        
-        wifi_end = U6_START + (U6_END - U6_START) * (wifi_ratio / 100)
-        self.wifi_freq_range = (U6_START, wifi_end)
-        self.cellular_freq_range = (wifi_end, U6_END)
+        if config.MODE == "Dynamic":
+            if (snapshot == 0):
+                wifi_ratio = 50
+            elif (snapshot == 1):
+                wifi_ratio = 70
+            elif (snapshot == 2):
+                wifi_ratio = 30
+            elif (snapshot == 3):
+                wifi_ratio = 80
+            elif (snapshot == 4):
+                wifi_ratio = 40
+            elif (snapshot == 5):
+                wifi_ratio = 75
+            
+            wifi_end = U6_START + (U6_END - U6_START) * (wifi_ratio / 100)
+            self.wifi_freq_range = (U6_START, wifi_end)
+            self.cellular_freq_range = (wifi_end, U6_END)
 
- 
+        elif config.MODE == "Cellular_Static":
+            self.cellular_freq_range = (U6_START, U6_END)
+            self.wifi_freq_range = (0, 0)
+
+        elif config.MODE == "Wifi_Static":
+            self.wifi_freq_range = (U6_START, U6_END)
+            self.cellular_freq_range = (0, 0)
+
+        elif config.MODE == "Static_Range":
+            wifi_end = U6_START + (U6_END - U6_START) * (config.spectrum_split / 100)
+            self.wifi_freq_range = (U6_START, wifi_end)
+            self.cellular_freq_range = (wifi_end, U6_END) 
 
 """
 STEP 2: Placing BS and HS 
@@ -263,7 +272,7 @@ for i in range(city_size[0]):
         traffic_demand = 0
         # setting the number of hs and bs acc to density [TODO]
         if pop_density == 2:
-            hs_count = 10  #10
+            hs_count = 7  #100x more 
             bs_count = 5 #5
         elif pop_density == 1:
             hs_count = 5   #5
@@ -360,6 +369,27 @@ def assign_group():
         indices = hs_tree.query_ball_point(unit.position, D_c)  # Returns indices of nearby units
         group_dict[unit.id] = [hs_units[i].id for i in indices if hs_units[i] != unit]  
 
+def group_units(units, distance_threshold):
+    if not units:
+        return []
+    
+    positions = [unit.position for unit in units]
+    tree = KDTree(positions)
+
+    visited = set()
+    groups = []
+
+    for idx, unit in enumerate(units):
+        if idx in visited:
+            continue
+        # Find all neighbors within distance_threshold
+        indices = tree.query_ball_point(unit.position, distance_threshold)
+        group = [units[i] for i in indices if i not in visited]
+        visited.update(indices)
+        groups.append(group)
+
+    return groups
+
 def get_frequency_allocated(unit):
     """Returns total frequency allocated to a unit in MHz."""
     total = 0
@@ -451,7 +481,9 @@ def allocate_spectrum(unit, bandwidth):
         else:
             unit.bandwidth = (db.cellular_freq_range[1]-db.cellular_freq_range[0])*1000
         unit.limit = round((db.cellular_freq_range[1]-db.cellular_freq_range[0]), 3) if unit.unit_type == UnitType.BS else round((db.wifi_freq_range[1]-db.wifi_freq_range[0]), 3)
+
     unit.congested = unit.bandwidth < unit.traffic_demand / 2
+
 
 
 def print_database_state(db, group_dict):
@@ -687,7 +719,7 @@ def plot_yearly_congestion(congestion_dict, label_prefix):
     for d in [0, 1, 2]:
         yearly_congestion = congestion_dict.get(d, [])
         if len(yearly_congestion) == len(x_vals):
-            print(f"Plotting {label_prefix} Density {d}: x_vals = {x_vals}, y_vals = {yearly_congestion}")
+            # print(f"Plotting {label_prefix} Density {d}: x_vals = {x_vals}, y_vals = {yearly_congestion}")
             plt.plot(x_vals, yearly_congestion, label=f"{label_prefix} Density {d}")
         else:
             print(f"[DEBUG] Skipping Density {d} — len(x_vals): {len(x_vals)}, len(yearly_congestion): {len(yearly_congestion)}")
@@ -788,6 +820,11 @@ def simulate_dynamic_allocation(demand_growth_rate):
 
         for day in range(NUM_DAYS):
             print(f"\n  Starting Day {day + 1}...\n")
+
+            for unit in db.database.values():
+                unit.bandwidth = 0
+                unit.congested = False
+
             for snapshot in range(6):
                 print(f"    Snapshot {snapshot + 1}:")
 
@@ -810,7 +847,32 @@ def simulate_dynamic_allocation(demand_growth_rate):
                         if unit.congested:
                             bs_congested += 1
                             yearly_density_congestion_bs[level] += 1
+                
+                total_hs_requested = sum(unit.traffic_demand for unit in db.database.values() if unit.unit_type == UnitType.HS)
+                total_bs_requested = sum(unit.traffic_demand for unit in db.database.values() if unit.unit_type == UnitType.BS)
+                print("Avg HS demand:", total_hs_requested / total_num_hs)
+                print("Avg BS demand:", total_bs_requested / total_num_bs)
 
+                # ---- Diagnostic Logging ----
+                hotspot_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.HS]
+                base_station_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.BS]
+
+                total_wifi_demand = sum(unit.traffic_demand for unit in hotspot_units)
+                total_cellular_demand = sum(unit.traffic_demand for unit in base_station_units)
+
+                hotspot_group_sizes = [len(group) for group in group_units(hotspot_units, config.D_w)]
+                base_station_group_sizes = [len(group) for group in group_units(base_station_units, config.D_c)]
+
+                print(f"\n---- Time Step Diagnostic (Wi-Fi Fraction = {(db.wifi_freq_range[1] - db.wifi_freq_range[0]):.2f}) ----")
+                print(f"Total Wi-Fi Demand: {total_wifi_demand:.2f} Mbps")
+                print(f"Total Cellular Demand: {total_cellular_demand:.2f} Mbps")
+                print(f"Avg Demand per Hotspot: {total_wifi_demand / len(hotspot_units):.2f} Mbps")
+                print(f"Avg Demand per Base Station: {total_cellular_demand / len(base_station_units):.2f} Mbps")
+
+                print(f"Number of Wi-Fi Groups: {len(hotspot_group_sizes)}")
+                print(f"Average Hotspot Group Size: {sum(hotspot_group_sizes)/len(hotspot_group_sizes):.2f}")
+                print(f"Number of Cellular Groups: {len(base_station_group_sizes)}")
+                print(f"Average Base Station Group Size: {sum(base_station_group_sizes)/len(base_station_group_sizes):.2f}")
 
                 while not db.request_queue.empty():  
                     request = db.request_queue.get()  
@@ -839,7 +901,7 @@ def simulate_dynamic_allocation(demand_growth_rate):
            
         print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
         print_database_state(db, group_dict)
-        demand_growth_rate *= 1.2
+        demand_growth_rate *= 1.5
         
         generate_report(year, total_num_hs, total_num_bs)
 
@@ -852,8 +914,8 @@ if __name__ == "__main__":
     plot_yearly_congestion(yearly_congestion_hs, "HS")
     plot_congestion_heatmap(yearly_congestion_bs, "BS")
     plot_congestion_heatmap(yearly_congestion_hs, "HS")
-    # animate_congestion(db_snapshots, UnitType.HS, "hs_congestion", city_size=(100, 100), population_density=population_density)
-    # animate_congestion(db_snapshots, UnitType.BS, "bs_congestion", city_size=(100, 100), population_density=population_density)
+    animate_congestion(db_snapshots, UnitType.HS, "hs_congestion", city_size=(100, 100), population_density=population_density)
+    animate_congestion(db_snapshots, UnitType.BS, "bs_congestion", city_size=(100, 100), population_density=population_density)
     # animate_congestion(db_snapshots, population_density, UnitType.HS, "hs_congestion", city_size)
     # animate_congestion(db_snapshots, population_density, UnitType.BS, "bs_congestion", city_size)
     # animate_congestion(db_snapshots, UnitType.HS, "hs_congestion", city_size)
