@@ -4,7 +4,7 @@
 D_w = 3  
 D_c = 2.2
 
-NUM_YEARS = 1
+NUM_YEARS = 10
 NUM_DAYS = 3
 
 traffic_demand_bounds = {
