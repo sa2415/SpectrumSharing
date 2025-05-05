@@ -86,7 +86,7 @@ pip install numpy matplotlib
 To run the simulation, execute the following command in the root directory:
 
 ```bash
-python main.py
+python networks.py
 ```
 
 You can edit simulation parameters inside config.py to customize:
