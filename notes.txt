@@ -1,3 +1,42 @@
+meeting notes 4/15
+- dynamic for area
+    - mini dbs per area only make sense if change assumptions on traffic patterns b/w high and low density areas
+- for each reagion and for ach time of day here's what the cellular avg is and wifi average is ---- inputs
+- every region has 12 numbers (6 for cell, 6 for wifi)
+
+----------- THE BIG FOUR -----------
+- static allocation that doesn't change w time or space
+- allocation that changes w space and not time
+- allocation that changes w time and not space
+- allocation that changes w both
+------------------------------------
+
+- should get better performance with more complex allocation strat
+- allocation strat and input are different
+- want first plot for each of the different regions
+    - should be different for each region
+
+
+1. code
+- make sure it's bug-free
+
+2. documentation
+- README about inputs and outputs
+- document about structurally how it's organized (diagram, paragraphs of what everything does)
+- inline comments about what each variable are etc
+
+3. results
+- wifi perf and cell perf on diff axes = good for 1 strat
+- each strat = a diff curve on the geography
+- same demand, diff strat, plot on curve
+
+
+4. submission
+- send github and zip file
+
+
+
+
 meeting notes 4/11
 
 inputs:
