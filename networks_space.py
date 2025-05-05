@@ -19,6 +19,7 @@ import numpy as np
 import matplotlib.animation as animation
 
 import config
+import pprint
 
 U6_START = 6.5
 U6_END = 7.2
@@ -37,6 +38,7 @@ NUM_DAYS = config.NUM_DAYS
 D_w = config.D_w 
 D_c = config.D_c
 traffic_demand_bounds = config.traffic_demand_bounds
+region_size = config.region_size
 
 db_snapshots = []
 yearly_stats = defaultdict(list)
@@ -51,7 +53,7 @@ class UnitType(Enum):
     HS = 1
 
 class NetworkUnit:
-    def __init__(self, id, position, traffic_demand, unit_type, density, region_id, limit=None):
+    def __init__(self, id, position, traffic_demand, unit_type, density, limit=None):
         self.id = id
         self.position = position
         self.traffic_demand = traffic_demand # units = MHz
@@ -62,7 +64,7 @@ class NetworkUnit:
         self.density = density
         self.limit = limit
         self.bandwidth = 0
-        self.region_id = region_id
+        self.region_id = None
 
     """
     STEP 4: Updating traffic demand according to population density and time of day
@@ -198,14 +200,6 @@ STEP 1: Create dat "map"!
 TODO: [Swati] - change population_density acc to time of day 
 Assign areas: Business, Residential, Shopping(Lunch)
 """
-
-city_size = (10, 10)
-np.random.seed(42) #to keep the initialization the same
-
-#simulating a pop density: 0 = Low, 1 = Medium, 2 = High
-population_density = np.random.choice([0, 1, 2], size=city_size, p=[0.3, 0.4, 0.3])
-
-
 class Database:
     def __init__(self):
         self.database = {}
@@ -256,7 +250,10 @@ class Database:
             self.cellular_freq_range = (wifi_end, U6_END) 
     
 def assign_initial_ratios(num_hs, num_bs):
-    ratio_hs = num_hs/(num_hs+num_bs)
+    ratio_hs = 0.5
+    if num_hs != 0 or num_bs != 0:
+        ratio_hs = num_hs/(num_hs+num_bs)
+    
     wifi_freq_range = (U6_START, ((U6_END-U6_START)*ratio_hs + U6_START))
     cellular_freq_range = (((U6_END-U6_START)*ratio_hs + U6_START), U6_END)
     return wifi_freq_range, cellular_freq_range
@@ -265,77 +262,114 @@ def assign_initial_ratios(num_hs, num_bs):
 STEP 2: Placing BS and HS 
 """
 db = Database()
-unit_id = 0
-block_size = 10
-grid_size = 100
-region_id = 0
 
-for i in range(city_size[0]):
-    for j in range(city_size[1]):
-        pop_density = population_density[i, j]
-        traffic_demand = 0
+city_size = (10, 10)           # number of blocks in y, x
+grid_size = 100                # total grid size (100x100)
+block_size = 10                # size of each block in grid units
 
-        # setting the number of hs and bs acc to density [TODO]
-        if pop_density == 2:
-            hs_count = 7  #100x more 
-            bs_count = 5 #5
-        elif pop_density == 1:
-            hs_count = 5   #5
-            bs_count = 2   #2
-        else:
-            hs_count = 3  #3
-            bs_count = 1  #1
+# Population density per block: 0=Low, 1=Med, 2=High
+np.random.seed(42)
+population_density = np.random.choice([0, 1, 2], size=city_size, p=[0.3, 0.4, 0.3])
 
-        units = set()
-        coordinates = set()
+def create_units():
+    unit_id = 0
+    for i in range(city_size[0]):
+        for j in range(city_size[1]):
+            pop_density = population_density[i, j]
+            traffic_demand = 0
+            # setting the number of hs and bs acc to density [TODO]
+            if pop_density == 2:
+                hs_count = 7  #100x more 
+                bs_count = 5 #5
+            elif pop_density == 1:
+                hs_count = 5   #5
+                bs_count = 2   #2
+            else:
+                hs_count = 3  #3
+                bs_count = 1  #1
 
-        for _ in range (hs_count):
-            x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
-            y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
-
-            # no 2 units can have the same coords 
-            while (x_pos, y_pos) in coordinates:
+            coordinates = set()
+            for _ in range (hs_count):
                 x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
                 y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
 
-            assert ((x_pos, y_pos) not in coordinates)
-            coordinates.add((x_pos, y_pos))
+                # no 2 units can have the same coords 
+                while (x_pos, y_pos) in coordinates:
+                    x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
+                    y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
 
-            db.database[unit_id] = NetworkUnit(unit_id, (x_pos, y_pos), traffic_demand, UnitType.HS, pop_density, region_id) 
-            units.add(unit_id)
-            unit_id += 1
+                assert ((x_pos, y_pos) not in coordinates)
+                coordinates.add((x_pos, y_pos))
 
-        for _ in range (bs_count):
-            x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
-            y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
+                db.database[unit_id] = NetworkUnit(unit_id, (x_pos, y_pos), traffic_demand, UnitType.HS, pop_density) 
+                unit_id += 1
 
-            # no 2 units can have the same coords 
-            while (x_pos, y_pos) in coordinates:
+
+            for _ in range (bs_count):
                 x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
                 y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
 
-            assert ((x_pos, y_pos) not in coordinates)
-            coordinates.add((x_pos, y_pos))
+                # no 2 units can have the same coords 
+                while (x_pos, y_pos) in coordinates:
+                    x_pos = random.randint(j * block_size, (j + 1) * block_size - 1)
+                    y_pos = random.randint(i * block_size, (i + 1) * block_size - 1)
 
-            db.database[unit_id] = NetworkUnit(unit_id, (x_pos, y_pos), traffic_demand, UnitType.BS, pop_density, region_id) 
-            units.add(unit_id)
-            unit_id += 1
-        
-        wifi_freq_range, cellular_freq_range = assign_initial_ratios(hs_count, bs_count)
-        db.region_database[region_id] = {
-            "pop_density": pop_density,
-            "units": units,
-            "wifi_freq_range": wifi_freq_range,
-            "cellular_freq_range": cellular_freq_range,
-        }
-        region_id += 1
+                assert ((x_pos, y_pos) not in coordinates)
+                coordinates.add((x_pos, y_pos))
 
+                db.database[unit_id] = NetworkUnit(unit_id, (x_pos, y_pos), traffic_demand, UnitType.BS, pop_density) 
+                unit_id += 1
+
+create_units()
 
 for u in db.database.values():
     if u.unit_type == UnitType.HS:
         total_num_hs += 1
     elif u.unit_type == UnitType.BS:
         total_num_bs += 1
+
+def create_regions(region_size):
+    region_map = {}
+    region_units = {}
+    region_id_counter = 0
+
+    # Assign regions by scanning the grid
+    for y in range(0, grid_size, region_size):
+        for x in range(0, grid_size, region_size):
+            region_map[(x, y)] = region_id_counter
+            region_units[region_id_counter] = set()
+            region_id_counter += 1
+
+    # Re-assign units to regions
+    for unit in db.database.values():
+        x, y = unit.position
+        region_x = (x // region_size) * region_size
+        region_y = (y // region_size) * region_size
+        region_id = region_map[(region_x, region_y)]
+
+        db.database[unit.id].region_id = region_id
+        region_units[region_id].add(unit.id)
+
+    # Finish region database
+    for rid, units in region_units.items():
+        hs_count = sum(1 for uid in units if db.database[uid].unit_type == UnitType.HS)
+        bs_count = sum(1 for uid in units if db.database[uid].unit_type == UnitType.BS)
+        wifi_freq_range, cellular_freq_range = assign_initial_ratios(hs_count, bs_count)
+
+        avg_pop_density = (
+            sum(db.database[uid].density for uid in units) // len(units)
+            if units else 0
+        )
+
+        db.region_database[rid] = {
+            "pop_density": avg_pop_density,
+            "units": units,
+            "wifi_freq_range": wifi_freq_range,
+            "cellular_freq_range": cellular_freq_range,
+        }
+
+    print("REGION DATABASE")
+    pprint.pprint(db.region_database)
 
 """
 STEP 3: Make a group dictionary 
@@ -894,7 +928,11 @@ def animate_congestion(db_snapshots, unit_type_to_plot, filename, city_size, pop
 STEP 7: Simulation loop 
 """
 def simulate_dynamic_allocation(demand_growth_rate):
-    for year in range(NUM_YEARS):
+    # for year in range(NUM_YEARS):
+    for region_size in [2,5,10,20,25,50,100]:
+        create_regions(region_size)
+        year = region_size
+
         print(f"\nStarting Year {year + 1}...\n")
         yearly_density_congestion_hs = {0: 0, 1: 0, 2: 0}
         yearly_density_congestion_bs = {0: 0, 1: 0, 2: 0}

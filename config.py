@@ -19,3 +19,5 @@ traffic_demand_bounds = {
 MODE = "Dynamic" 
 
 spectrum_split = 10 
+
+region_size = 10

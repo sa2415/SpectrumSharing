@@ -2,98 +2,18 @@
 
 
 =============================================================================
-================================== Year 0 ==================================
-=============================================================================
-Percentage of congested Hotspots: 44.919%
-Percentage of congested Base Stations: 51.953%
-
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 64263.106
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 130.616
-Percentage of Total Wifi Traffic Demand Met: 57.247%
-
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 20571.881
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 80.359
-Percentage of Total Cellular Traffic Demand Met: 69.431%
-
-=============================================================================
-=============================================================================
-=============================================================================
-
-
-
-=============================================================================
-================================== Year 1 ==================================
-=============================================================================
-Percentage of congested Hotspots: 44.919%
-Percentage of congested Base Stations: 58.984%
-
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 94460.670
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 191.993
-Percentage of Total Wifi Traffic Demand Met: 58.028%
-
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 35407.353
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 138.310
-Percentage of Total Cellular Traffic Demand Met: 64.868%
-
-=============================================================================
-=============================================================================
-=============================================================================
-
-
-
-=============================================================================
 ================================== Year 2 ==================================
 =============================================================================
-Percentage of congested Hotspots: 44.919%
-Percentage of congested Base Stations: 58.594%
+Percentage of congested Hotspots: 45.122%
+Percentage of congested Base Stations: 53.125%
 
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 141657.234
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 287.921
-Percentage of Total Wifi Traffic Demand Met: 58.032%
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 37315.751
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 75.845
+Percentage of Total Wifi Traffic Demand Met: 75.133%
 
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 60066.073
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 234.633
-Percentage of Total Cellular Traffic Demand Met: 60.347%
-
-=============================================================================
-=============================================================================
-=============================================================================
-
-
-
-=============================================================================
-================================== Year 3 ==================================
-=============================================================================
-Percentage of congested Hotspots: 64.228%
-Percentage of congested Base Stations: 70.312%
-
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 285669.650
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 580.629
-Percentage of Total Wifi Traffic Demand Met: 43.716%
-
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 109926.565
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 429.401
-Percentage of Total Cellular Traffic Demand Met: 51.321%
-
-=============================================================================
-=============================================================================
-=============================================================================
-
-
-
-=============================================================================
-================================== Year 4 ==================================
-=============================================================================
-Percentage of congested Hotspots: 83.943%
-Percentage of congested Base Stations: 87.891%
-
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 545296.854
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 1108.327
-Percentage of Total Wifi Traffic Demand Met: 28.174%
-
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 209887.307
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 819.872
-Percentage of Total Cellular Traffic Demand Met: 38.382%
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 27391.393
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 106.998
+Percentage of Total Cellular Traffic Demand Met: 59.204%
 
 =============================================================================
 =============================================================================
@@ -104,16 +24,36 @@ Percentage of Total Cellular Traffic Demand Met: 38.382%
 =============================================================================
 ================================== Year 5 ==================================
 =============================================================================
-Percentage of congested Hotspots: 100.000%
-Percentage of congested Base Stations: 93.750%
+Percentage of congested Hotspots: 47.764%
+Percentage of congested Base Stations: 61.328%
 
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 949093.160
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 1929.051
-Percentage of Total Wifi Traffic Demand Met: 16.681%
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 71088.602
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 144.489
+Percentage of Total Wifi Traffic Demand Met: 68.421%
 
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 368746.428
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 1440.416
-Percentage of Total Cellular Traffic Demand Met: 27.512%
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 49576.436
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 193.658
+Percentage of Total Cellular Traffic Demand Met: 50.767%
+
+=============================================================================
+=============================================================================
+=============================================================================
+
+
+
+=============================================================================
+================================== Year 10 ==================================
+=============================================================================
+Percentage of congested Hotspots: 66.870%
+Percentage of congested Base Stations: 100.000%
+
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 124141.583
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 252.320
+Percentage of Total Wifi Traffic Demand Met: 63.250%
+
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 89941.573
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 351.334
+Percentage of Total Cellular Traffic Demand Met: 40.431%
 
 =============================================================================
 =============================================================================
@@ -122,38 +62,58 @@ Percentage of Total Cellular Traffic Demand Met: 27.512%
 
 
 =============================================================================
-================================== Year 6 ==================================
+================================== Year 20 ==================================
+=============================================================================
+Percentage of congested Hotspots: 77.236%
+Percentage of congested Base Stations: 100.000%
+
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 232751.326
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 473.072
+Percentage of Total Wifi Traffic Demand Met: 54.060%
+
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 161320.235
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 630.157
+Percentage of Total Cellular Traffic Demand Met: 28.802%
+
+=============================================================================
+=============================================================================
+=============================================================================
+
+
+
+=============================================================================
+================================== Year 25 ==================================
+=============================================================================
+Percentage of congested Hotspots: 93.699%
+Percentage of congested Base Stations: 100.000%
+
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 454761.950
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 924.313
+Percentage of Total Wifi Traffic Demand Met: 40.196%
+
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 271360.445
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 1060.002
+Percentage of Total Cellular Traffic Demand Met: 20.604%
+
+=============================================================================
+=============================================================================
+=============================================================================
+
+
+
+=============================================================================
+================================== Year 50 ==================================
 =============================================================================
 Percentage of congested Hotspots: 100.000%
 Percentage of congested Base Stations: 100.000%
 
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 1518080.579
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 3085.530
-Percentage of Total Wifi Traffic Demand Met: 11.327%
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 824024.420
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 1674.846
+Percentage of Total Wifi Traffic Demand Met: 27.705%
 
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 623790.469
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 2436.682
-Percentage of Total Cellular Traffic Demand Met: 18.570%
-
-=============================================================================
-=============================================================================
-=============================================================================
-
-
-
-=============================================================================
-================================== Year 7 ==================================
-=============================================================================
-Percentage of congested Hotspots: 100.000%
-Percentage of congested Base Stations: 100.000%
-
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 2365991.031
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 4808.925
-Percentage of Total Wifi Traffic Demand Met: 7.671%
-
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 1003097.036
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 3918.348
-Percentage of Total Cellular Traffic Demand Met: 12.490%
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 438197.195
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 1711.708
+Percentage of Total Cellular Traffic Demand Met: 14.255%
 
 =============================================================================
 =============================================================================
@@ -162,38 +122,18 @@ Percentage of Total Cellular Traffic Demand Met: 12.490%
 
 
 =============================================================================
-================================== Year 8 ==================================
+================================== Year 100 ==================================
 =============================================================================
 Percentage of congested Hotspots: 100.000%
 Percentage of congested Base Stations: 100.000%
 
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 3647202.877
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 7413.014
-Percentage of Total Wifi Traffic Demand Met: 5.157%
+Total Unserviced Traffic Demand (Mbps) for Hotspots: 1384255.375
+Avg Unserviced Traffic Demand (Mbps) per Hotspot: 2813.527
+Percentage of Total Wifi Traffic Demand Met: 18.893%
 
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 1576539.095
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 6158.356
-Percentage of Total Cellular Traffic Demand Met: 8.355%
-
-=============================================================================
-=============================================================================
-=============================================================================
-
-
-
-=============================================================================
-================================== Year 9 ==================================
-=============================================================================
-Percentage of congested Hotspots: 100.000%
-Percentage of congested Base Stations: 100.000%
-
-Total Unserviced Traffic Demand (Mbps) for Hotspots: 5585550.013
-Avg Unserviced Traffic Demand (Mbps) per Hotspot: 11352.744
-Percentage of Total Wifi Traffic Demand Met: 3.448%
-
-Total Unserviced Traffic Demand (Mbps) for Base Stations: 2437238.329
-Avg Unserviced Traffic Demand (Mbps) per Base Station: 9520.462
-Percentage of Total Cellular Traffic Demand Met: 5.580%
+Total Unserviced Traffic Demand (Mbps) for Base Stations: 692262.216
+Avg Unserviced Traffic Demand (Mbps) per Base Station: 2704.149
+Percentage of Total Cellular Traffic Demand Met: 9.817%
 
 =============================================================================
 =============================================================================
