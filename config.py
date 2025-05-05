@@ -1,11 +1,10 @@
 
 # Origin is top-left
-# D_w, D_c = 10, 25
 D_w = 3  
 D_c = 2.2
 
 NUM_YEARS = 1
-NUM_DAYS = 3
+NUM_DAYS = 30
 
 traffic_demand_bounds = {
     0: (100, 200),
@@ -16,6 +15,6 @@ traffic_demand_bounds = {
 # Different modes of spectrum allocation
 # Static: Fixed allocation of spectrum to each user
 # Dynamic: Spectrum allocation changes based on demand
-MODE = "Dynamic" 
+MODE = "Static_Range" 
 
-spectrum_split = 10 
+spectrum_split = 0
