@@ -210,31 +210,27 @@ class Database:
         # region contains {region_id, pop_density, list of unit_ids, wifi_freq_range, cellular_freq_range}
 
     def update_ratios(self, snapshot):
-        """
-         0:00 -  8:00 : low usage       (wifi:cell = 50:50)
-         8:00 - 12:00 : high wifi usage (wifi:cell = 70:30)
-        12:00 - 15:00 : high cell usage (wifi:cell = 30:70)
-        15:00 - 17:00 : high wifi usage (wifi:cell = 80:20)
-        17:00 - 19:00 : high cell usage (wifi:cell = 40:60)
-        19:00 - 24:00 : high wifi usage (wifi:cell = 75:25)
-        """
+        REGION_TRAFFIC_PROFILES = {
+            "residential": lambda t: 60 + 30 * math.cos(2 * math.pi * (t - 0.8)),   # wifi peaks in evening
+            "commercial":  lambda t: 40 + 30 * math.cos(2 * math.pi * (t - 0.25)),  # wifi peaks in morning
+            "recreational":  lambda t: 50 + 20 * math.cos(2 * math.pi * (t - 0.5)),   # more uniform
+        }
+
         if config.MODE == "Dynamic":
-            if (snapshot == 0):
-                wifi_ratio = 50
-            elif (snapshot == 1):
-                wifi_ratio = 70
-            elif (snapshot == 2):
-                wifi_ratio = 30
-            elif (snapshot == 3):
-                wifi_ratio = 80
-            elif (snapshot == 4):
-                wifi_ratio = 40
-            elif (snapshot == 5):
-                wifi_ratio = 75
-            
-            wifi_end = U6_START + (U6_END - U6_START) * (wifi_ratio / 100)
-            self.wifi_freq_range = (U6_START, wifi_end)
-            self.cellular_freq_range = (wifi_end, U6_END)
+            for region_id, mini_db in self.region_database.items():
+                region_type = mini_db["region_type"]
+                total_snapshots = 6
+                time_fraction = snapshot / total_snapshots  # normalized [0,1)
+
+                # Select appropriate traffic profile function
+                profile_fn = REGION_TRAFFIC_PROFILES.get(region_type, lambda t: 50)
+
+                wifi_ratio = profile_fn(time_fraction)
+                wifi_ratio = max(0, min(100, wifi_ratio))  # clamp
+                
+                wifi_end = U6_START + (U6_END - U6_START) * (wifi_ratio / 100)
+                self.region_database[region_id]["wifi_freq_range"] = (U6_START, wifi_end)
+                self.region_database[region_id]["cellular_freq_range"] = (wifi_end, U6_END)
 
         elif config.MODE == "Cellular_Static":
             self.cellular_freq_range = (U6_START, U6_END)
@@ -332,6 +328,7 @@ def create_regions(region_size):
     region_map = {}
     region_units = {}
     region_id_counter = 0
+    REGION_TYPES = ["residential", "commercial", "recreational"]
 
     # Assign regions by scanning the grid
     for y in range(0, grid_size, region_size):
@@ -361,11 +358,14 @@ def create_regions(region_size):
             if units else 0
         )
 
+        region_type = random.choice(REGION_TYPES)
+
         db.region_database[rid] = {
             "pop_density": avg_pop_density,
             "units": units,
             "wifi_freq_range": wifi_freq_range,
             "cellular_freq_range": cellular_freq_range,
+            "region_type": region_type,
         }
 
     print("REGION DATABASE")
@@ -607,11 +607,9 @@ yearly_stats = {
     "percent_traffic_demand_met_bs": []
 }
 
-def generate_report(year, total_num_hs, total_num_bs):
+def generate_report(region_size, year, total_num_hs, total_num_bs):
     with open(report_file_path, "a") as f:
-        f.write(f"\n\n\n=============================================================================\n")
-        f.write(f"================================== Year {year} ==================================\n")
-        f.write(f"=============================================================================\n")
+        f.write(f"\n=============== Region Size {region_size}, Year {year} ==================\n")
 
         num_congested_hs = 0
         num_congested_bs = 0
@@ -674,8 +672,6 @@ def generate_report(year, total_num_hs, total_num_bs):
         #     f.write(f"Unit {unit_id} Pos {(x, y)}: {bs_congestion[unit_id]}\n")
 
         f.write(f"\n=============================================================================\n")
-        f.write(f"=============================================================================\n")
-        f.write(f"=============================================================================\n")
 
         yearly_stats["congested_hs_percent"].append(congested_hs)
         yearly_stats["congested_bs_percent"].append(congested_bs)
@@ -734,100 +730,100 @@ def generate_report(year, total_num_hs, total_num_bs):
             plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_bandwidth_comparison_day1_bar.png")
             plt.close()
 
-            # === Plot: Spectrum Allocation (Stacked bar chart) for mini db ===
-            grouped_data = {0: [], 1: [], 2: []}
+            # # === Plot: Spectrum Allocation (Stacked bar chart) for mini db ===
+            # grouped_data = {0: [], 1: [], 2: []}
 
-            for region_id, mini_db in db.region_database.items():
-                pop_density = mini_db["pop_density"]
-                hs_bandwidth = mini_db["wifi_freq_range"][1] - mini_db["wifi_freq_range"][0]
-                bs_bandwidth = mini_db["cellular_freq_range"][1] - mini_db["cellular_freq_range"][0]
-                grouped_data[pop_density].append((region_id, hs_bandwidth, bs_bandwidth))
+            # for region_id, mini_db in db.region_database.items():
+            #     pop_density = mini_db["pop_density"]
+            #     hs_bandwidth = mini_db["wifi_freq_range"][1] - mini_db["wifi_freq_range"][0]
+            #     bs_bandwidth = mini_db["cellular_freq_range"][1] - mini_db["cellular_freq_range"][0]
+            #     grouped_data[pop_density].append((region_id, hs_bandwidth, bs_bandwidth))
 
-            region_ids = []
-            hs_bandwidths = []
-            bs_bandwidths = []
-            density_labels = []
+            # region_ids = []
+            # hs_bandwidths = []
+            # bs_bandwidths = []
+            # density_labels = []
 
-            for density in sorted(grouped_data.keys()):
-                for region_id, hs_bw, bs_bw in grouped_data[density]:
-                    region_ids.append(region_id)
-                    hs_bandwidths.append(hs_bw)
-                    bs_bandwidths.append(bs_bw)
-                    density_labels.append(density)
+            # for density in sorted(grouped_data.keys()):
+            #     for region_id, hs_bw, bs_bw in grouped_data[density]:
+            #         region_ids.append(region_id)
+            #         hs_bandwidths.append(hs_bw)
+            #         bs_bandwidths.append(bs_bw)
+            #         density_labels.append(density)
 
-            x = list(range(len(region_ids)))
+            # x = list(range(len(region_ids)))
 
-            plt.figure(figsize=(30, 5))
-            plt.bar(x, hs_bandwidths, label='Wi-Fi (HS)', color='skyblue')
-            plt.bar(x, bs_bandwidths, bottom=hs_bandwidths, label='Cellular (BS)', color='salmon')
-            plt.xlabel("Region ID (Grouped by Population Density)")
-            plt.ylabel("Total Spectrum Allocated (MHz)")
-            plt.title("Spectrum Allocation Grouped by Population Density")
+            # plt.figure(figsize=(30, 5))
+            # plt.bar(x, hs_bandwidths, label='Wi-Fi (HS)', color='skyblue')
+            # plt.bar(x, bs_bandwidths, bottom=hs_bandwidths, label='Cellular (BS)', color='salmon')
+            # plt.xlabel("Region ID (Grouped by Population Density)")
+            # plt.ylabel("Total Spectrum Allocated (GHz)")
+            # plt.title("Spectrum Allocation Grouped by Population Density")
 
-            # Add vertical lines or shading to separate density groups
-            prev = 0
-            for density in sorted(grouped_data.keys()):
-                count = len(grouped_data[density])
-                if count == 0:
-                    continue
-                mid = prev + count / 2
-                plt.text(mid, max(hs_bandwidths) + max(bs_bandwidths) * 0.05, f"Density {density}", ha='center', fontsize=10, fontweight='bold')
-                if density != 0:
-                    plt.axvline(prev, color='gray', linestyle='--', linewidth=0.8)
-                prev += count
+            # # Add vertical lines or shading to separate density groups
+            # prev = 0
+            # for density in sorted(grouped_data.keys()):
+            #     count = len(grouped_data[density])
+            #     if count == 0:
+            #         continue
+            #     mid = prev + count / 2
+            #     plt.text(mid, max(hs_bandwidths) + max(bs_bandwidths) * 0.05, f"Density {density}", ha='center', fontsize=10, fontweight='bold')
+            #     if density != 0:
+            #         plt.axvline(prev, color='gray', linestyle='--', linewidth=0.8)
+            #     prev += count
 
-            plt.xticks(x, region_ids, rotation=45)
-            plt.legend()
-            plt.grid(True, axis='y')
-            plt.tight_layout()
-            plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_bandwidth_comparison_day1_grouped_by_density.png")
-            plt.close()
+            # plt.xticks(x, region_ids, rotation=45)
+            # plt.legend()
+            # plt.grid(True, axis='y')
+            # plt.tight_layout()
+            # plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_bandwidth_comparison_day1_grouped_by_density.png")
+            # plt.close()
 
-        if year == NUM_YEARS - 1:
-            os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
-            years = list(range(1, NUM_YEARS + 1))
+        # if year == NUM_YEARS - 1:
+        #     os.makedirs(OUTPUT_DIR_PATH, exist_ok=True)
+        #     years = list(range(1, NUM_YEARS + 1))
 
-            # --- Over all (Over years) ---#
+        #     # --- Over all (Over years) ---#
 
-            # Plot 1: Hotspot Congestion Over Time
-            plt.figure(figsize=(8, 5))
-            plt.plot(years, yearly_stats["congested_hs_percent"], color="royalblue", marker="o")
-            plt.xlabel("Year")
-            plt.ylabel("HS Congestion (%)")
-            plt.title("Hotspot Congestion Over Time")
-            plt.grid(True)
-            plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_hs_congestion_plot.png")
-            plt.close()
+        #     # Plot 1: Hotspot Congestion Over Time
+        #     plt.figure(figsize=(8, 5))
+        #     plt.plot(years, yearly_stats["congested_hs_percent"], color="royalblue", marker="o")
+        #     plt.xlabel("Year")
+        #     plt.ylabel("HS Congestion (%)")
+        #     plt.title("Hotspot Congestion Over Time")
+        #     plt.grid(True)
+        #     plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_hs_congestion_plot.png")
+        #     plt.close()
 
-            # Plot 2: Base Station Congestion Over Time
-            plt.figure(figsize=(8, 5))
-            plt.plot(years, yearly_stats["congested_bs_percent"], color="firebrick", marker="o")
-            plt.xlabel("Year")
-            plt.ylabel("BS Congestion (%)")
-            plt.title("Base Station Congestion Over Time")
-            plt.grid(True)
-            plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_bs_congestion_plot.png")
-            plt.close()
+        #     # Plot 2: Base Station Congestion Over Time
+        #     plt.figure(figsize=(8, 5))
+        #     plt.plot(years, yearly_stats["congested_bs_percent"], color="firebrick", marker="o")
+        #     plt.xlabel("Year")
+        #     plt.ylabel("BS Congestion (%)")
+        #     plt.title("Base Station Congestion Over Time")
+        #     plt.grid(True)
+        #     plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_bs_congestion_plot.png")
+        #     plt.close()
 
-            # Plot 3: Wi-Fi Traffic Demand Met
-            plt.figure(figsize=(8, 5))
-            plt.plot(years, yearly_stats["percent_traffic_demand_met_hs"], color="seagreen", marker="o")
-            plt.xlabel("Year")
-            plt.ylabel("Wi-Fi Traffic Demand Met (%)")
-            plt.title("Wi-Fi Traffic Demand Satisfaction Over Time")
-            plt.grid(True)
-            plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_wifi_demand_met_plot.png")
-            plt.close()
+        #     # Plot 3: Wi-Fi Traffic Demand Met
+        #     plt.figure(figsize=(8, 5))
+        #     plt.plot(years, yearly_stats["percent_traffic_demand_met_hs"], color="seagreen", marker="o")
+        #     plt.xlabel("Year")
+        #     plt.ylabel("Wi-Fi Traffic Demand Met (%)")
+        #     plt.title("Wi-Fi Traffic Demand Satisfaction Over Time")
+        #     plt.grid(True)
+        #     plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_wifi_demand_met_plot.png")
+        #     plt.close()
 
-            # Plot 4: Cellular Traffic Demand Met
-            plt.figure(figsize=(8, 5))
-            plt.plot(years, yearly_stats["percent_traffic_demand_met_bs"], color="goldenrod", marker="o")
-            plt.xlabel("Year")
-            plt.ylabel("Cellular Traffic Demand Met (%)")
-            plt.title("Cellular Traffic Demand Satisfaction Over Time")
-            plt.grid(True)
-            plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_cellular_demand_met_plot.png")
-            plt.close()
+        #     # Plot 4: Cellular Traffic Demand Met
+        #     plt.figure(figsize=(8, 5))
+        #     plt.plot(years, yearly_stats["percent_traffic_demand_met_bs"], color="goldenrod", marker="o")
+        #     plt.xlabel("Year")
+        #     plt.ylabel("Cellular Traffic Demand Met (%)")
+        #     plt.title("Cellular Traffic Demand Satisfaction Over Time")
+        #     plt.grid(True)
+        #     plt.savefig(f"{OUTPUT_DIR_PATH}/{NUM_YEARS}_cellular_demand_met_plot.png")
+        #     plt.close()
 
 
 def plot_yearly_congestion(congestion_dict, label_prefix):
@@ -928,104 +924,104 @@ def animate_congestion(db_snapshots, unit_type_to_plot, filename, city_size, pop
 STEP 7: Simulation loop 
 """
 def simulate_dynamic_allocation(demand_growth_rate):
-    # for year in range(NUM_YEARS):
-    for region_size in [2,5,10,20,25,50,100]:
-        create_regions(region_size)
-        year = region_size
+    for year in range(NUM_YEARS):
+        for region_size in [2,5,10,20,25,50,100]:
+            create_regions(region_size)
 
-        print(f"\nStarting Year {year + 1}...\n")
-        yearly_density_congestion_hs = {0: 0, 1: 0, 2: 0}
-        yearly_density_congestion_bs = {0: 0, 1: 0, 2: 0}
-        hs_total = {0: 0, 1: 0, 2: 0}
-        bs_total = {0: 0, 1: 0, 2: 0}
+            print(f"\nRegion Size = {region_size}")
+            print(f"\nStarting Year {year + 1}...\n")
+            yearly_density_congestion_hs = {0: 0, 1: 0, 2: 0}
+            yearly_density_congestion_bs = {0: 0, 1: 0, 2: 0}
+            hs_total = {0: 0, 1: 0, 2: 0}
+            bs_total = {0: 0, 1: 0, 2: 0}
 
-        for day in range(NUM_DAYS):
-            print(f"\n  Starting Day {day + 1}...\n")
-
-            for unit in db.database.values():
-                unit.bandwidth = 0
-                unit.congested = False
-
-            for snapshot in range(6):
-                print(f"    Snapshot {snapshot + 1}:")
-
-                # Clear congestion tracking
-                hs_congested = 0
-                bs_congested = 0
+            for day in range(NUM_DAYS):
+                print(f"\n  Starting Day {day + 1}...\n")
 
                 for unit in db.database.values():
-                    unit.update_traffic_demand(snapshot, demand_growth_rate, traffic_demand_bounds)            
-                    unit.make_request(db.request_queue)
-                    level = unit.density
-                    if unit.unit_type == UnitType.HS:
-                        hs_total[level] += 1
-                        if unit.congested:
-                            hs_congested += 1
-                            yearly_density_congestion_hs[level] += 1
- 
-                    elif unit.unit_type == UnitType.BS:
-                        bs_total[level] += 1
-                        if unit.congested:
-                            bs_congested += 1
-                            yearly_density_congestion_bs[level] += 1
+                    unit.bandwidth = 0
+                    unit.congested = False
+
+                for snapshot in range(6):
+                    print(f"    Snapshot {snapshot + 1}:")
+
+                    # Clear congestion tracking
+                    hs_congested = 0
+                    bs_congested = 0
+
+                    for unit in db.database.values():
+                        unit.update_traffic_demand(snapshot, demand_growth_rate, traffic_demand_bounds)            
+                        unit.make_request(db.request_queue)
+                        level = unit.density
+                        if unit.unit_type == UnitType.HS:
+                            hs_total[level] += 1
+                            if unit.congested:
+                                hs_congested += 1
+                                yearly_density_congestion_hs[level] += 1
+    
+                        elif unit.unit_type == UnitType.BS:
+                            bs_total[level] += 1
+                            if unit.congested:
+                                bs_congested += 1
+                                yearly_density_congestion_bs[level] += 1
+                    
+                    total_hs_requested = sum(unit.traffic_demand for unit in db.database.values() if unit.unit_type == UnitType.HS)
+                    total_bs_requested = sum(unit.traffic_demand for unit in db.database.values() if unit.unit_type == UnitType.BS)
+                    print("Avg HS demand:", total_hs_requested / total_num_hs)
+                    print("Avg BS demand:", total_bs_requested / total_num_bs)
+
+                    # ---- Diagnostic Logging ----
+                    hotspot_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.HS]
+                    base_station_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.BS]
+
+                    total_wifi_demand = sum(unit.traffic_demand for unit in hotspot_units)
+                    total_cellular_demand = sum(unit.traffic_demand for unit in base_station_units)
+
+                    hotspot_group_sizes = [len(group) for group in group_units(hotspot_units, config.D_w)]
+                    base_station_group_sizes = [len(group) for group in group_units(base_station_units, config.D_c)]
+
+                    print(f"\n---- Time Step Diagnostic (Wi-Fi Fraction = {(db.wifi_freq_range[1] - db.wifi_freq_range[0]):.2f}) ----")
+                    print(f"Total Wi-Fi Demand: {total_wifi_demand:.2f} Mbps")
+                    print(f"Total Cellular Demand: {total_cellular_demand:.2f} Mbps")
+                    print(f"Avg Demand per Hotspot: {total_wifi_demand / len(hotspot_units):.2f} Mbps")
+                    print(f"Avg Demand per Base Station: {total_cellular_demand / len(base_station_units):.2f} Mbps")
+
+                    print(f"Number of Wi-Fi Groups: {len(hotspot_group_sizes)}")
+                    print(f"Average Hotspot Group Size: {sum(hotspot_group_sizes)/len(hotspot_group_sizes):.2f}")
+                    print(f"Number of Cellular Groups: {len(base_station_group_sizes)}")
+                    print(f"Average Base Station Group Size: {sum(base_station_group_sizes)/len(base_station_group_sizes):.2f}")
+
+                    while not db.request_queue.empty():  
+                        request = db.request_queue.get()  
+                        unit_id, bandwidth = request 
+                        unit = db.database[unit_id]
+
+                        allocate_spectrum(unit, bandwidth)
+
+                    db.update_ratios(snapshot)
+
+                    daily_snapshot_stats["hs_congestion"][snapshot].append(hs_congested / total_num_hs * 100)
+                    daily_snapshot_stats["bs_congestion"][snapshot].append(bs_congested / total_num_bs * 100)
+                    daily_snapshot_stats["hs_bandwidth"][snapshot].append(db.cellular_freq_range[1] - db.cellular_freq_range[0])
+                    daily_snapshot_stats["bs_bandwidth"][snapshot].append(db.wifi_freq_range[1] - db.wifi_freq_range[0])
                 
-                total_hs_requested = sum(unit.traffic_demand for unit in db.database.values() if unit.unit_type == UnitType.HS)
-                total_bs_requested = sum(unit.traffic_demand for unit in db.database.values() if unit.unit_type == UnitType.BS)
-                print("Avg HS demand:", total_hs_requested / total_num_hs)
-                print("Avg BS demand:", total_bs_requested / total_num_bs)
+            db_snapshots.append(copy.deepcopy(db.database))
 
-                # ---- Diagnostic Logging ----
-                hotspot_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.HS]
-                base_station_units = [unit for unit in db.database.values() if unit.unit_type == UnitType.BS]
 
-                total_wifi_demand = sum(unit.traffic_demand for unit in hotspot_units)
-                total_cellular_demand = sum(unit.traffic_demand for unit in base_station_units)
-
-                hotspot_group_sizes = [len(group) for group in group_units(hotspot_units, config.D_w)]
-                base_station_group_sizes = [len(group) for group in group_units(base_station_units, config.D_c)]
-
-                print(f"\n---- Time Step Diagnostic (Wi-Fi Fraction = {(db.wifi_freq_range[1] - db.wifi_freq_range[0]):.2f}) ----")
-                print(f"Total Wi-Fi Demand: {total_wifi_demand:.2f} Mbps")
-                print(f"Total Cellular Demand: {total_cellular_demand:.2f} Mbps")
-                print(f"Avg Demand per Hotspot: {total_wifi_demand / len(hotspot_units):.2f} Mbps")
-                print(f"Avg Demand per Base Station: {total_cellular_demand / len(base_station_units):.2f} Mbps")
-
-                print(f"Number of Wi-Fi Groups: {len(hotspot_group_sizes)}")
-                print(f"Average Hotspot Group Size: {sum(hotspot_group_sizes)/len(hotspot_group_sizes):.2f}")
-                print(f"Number of Cellular Groups: {len(base_station_group_sizes)}")
-                print(f"Average Base Station Group Size: {sum(base_station_group_sizes)/len(base_station_group_sizes):.2f}")
-
-                while not db.request_queue.empty():  
-                    request = db.request_queue.get()  
-                    unit_id, bandwidth = request 
-                    unit = db.database[unit_id]
-
-                    allocate_spectrum(unit, bandwidth)
-
-                # db.update_ratios(snapshot)
-
-                daily_snapshot_stats["hs_congestion"][snapshot].append(hs_congested / total_num_hs * 100)
-                daily_snapshot_stats["bs_congestion"][snapshot].append(bs_congested / total_num_bs * 100)
-                daily_snapshot_stats["hs_bandwidth"][snapshot].append(db.cellular_freq_range[1] - db.cellular_freq_range[0])
-                daily_snapshot_stats["bs_bandwidth"][snapshot].append(db.wifi_freq_range[1] - db.wifi_freq_range[0])
+            for d in [0, 1, 2]:
+                hs_ratio = 100 * yearly_density_congestion_hs[d] / max(1, hs_total[d])
+                bs_ratio = 100 * yearly_density_congestion_bs[d] / max(1, bs_total[d])
+                # print(f"[DEBUG] Appending to congestion stats — Year {year}, Density {d}, BS Ratio = {bs_ratio}")
+                # print(f"[DEBUG] yearly_density_congestion_bs[{d}] = {yearly_density_congestion_bs[d]}, bs_total[{d}] = {bs_total[d]}")
+                yearly_congestion_hs[d].append(hs_ratio)
+                yearly_congestion_bs[d].append(bs_ratio)
             
-        db_snapshots.append(copy.deepcopy(db.database))
-
-
-        for d in [0, 1, 2]:
-            hs_ratio = 100 * yearly_density_congestion_hs[d] / max(1, hs_total[d])
-            bs_ratio = 100 * yearly_density_congestion_bs[d] / max(1, bs_total[d])
-            # print(f"[DEBUG] Appending to congestion stats — Year {year}, Density {d}, BS Ratio = {bs_ratio}")
-            # print(f"[DEBUG] yearly_density_congestion_bs[{d}] = {yearly_density_congestion_bs[d]}, bs_total[{d}] = {bs_total[d]}")
-            yearly_congestion_hs[d].append(hs_ratio)
-            yearly_congestion_bs[d].append(bs_ratio)
-           
-        print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
-        print_database_state(db, group_dict)
-        print_mini_database_state(db, group_dict)
-        demand_growth_rate *= 1.5
-        
-        generate_report(year, total_num_hs, total_num_bs)
+            print(f"\nDatabase after Year {year + 1}, Day {day + 1}:\n")
+            print_database_state(db, group_dict)
+            print_mini_database_state(db, group_dict)
+            demand_growth_rate *= 1.5
+            
+            generate_report(region_size, year, total_num_hs, total_num_bs)
 
 if __name__ == "__main__":
     open(report_file_path, "w").close()
